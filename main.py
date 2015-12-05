@@ -20,28 +20,18 @@ import random
 
 from theano.tensor.shared_randomstreams import RandomStreams
 
-from sklearn import preprocessing
-
-
-learning_rate=0.1
+learning_rate=0.01
 training_epochs=15
 batch_size=20
 n_chains=20
 n_samples=10
 output_folder='rbm_plots',
 n_hidden=20
+k=15
 
 data = np.load('train_data.npy')
-labels = np.load('train_labels.npy')
 
 n_visible = data.shape[1]
-
-# Converting labels to floats, needed by theano
-le = preprocessing.LabelEncoder()
-le.fit(labels)
-int_labels = le.transform(labels)
-
-# le.inverser_transform(int_labels) to get the string labels
 
 # Split of train_data for cross-validation
 n_fold = 3
@@ -51,26 +41,19 @@ random.seed(0)
 permutation = np.random.permutation(data.shape[0])
 
 test_idx = permutation[range(test_n)]
-test_set_x = data[test_idx,:]
-test_set_y = int_labels[test_idx]
+test_set = data[test_idx,:]
 
 train_idx = permutation[-np.array(range(test_n))]
-train_set_x = data[train_idx,:]
-train_set_y = int_labels[train_idx]
+train_set = data[train_idx,:]
 
 # Building of theano format datasets
-datasets = load_data((train_set_x, train_set_y),
-                     (test_set_x, test_set_y))
-
-train_set_x, train_set_y = datasets[0]
-test_set_x, test_set_y = datasets[1]
-
+train_set, test_set = load_data(train_set, test_set)
 
 # compute number of minibatches for training, validation and testing
-n_train_batches = train_set_x.get_value(borrow=True).shape[0] / batch_size
+n_train_batches = train_set.get_value(borrow=True).shape[0] / batch_size
 
 # allocate symbolic variables for the data
-index = T.lscalar()    # index to a [mini]batch
+index = T.lscalar()  # index to a [mini]batch
 x = T.matrix('x')  # the data is presented as rasterized images
 
 rng = np.random.RandomState(123)
@@ -79,16 +62,20 @@ theano_rng = RandomStreams(rng.randint(2 ** 30))
 # initialize storage for the persistent chain (state = hidden
 # layer of chain)
 persistent_chain = theano.shared(np.zeros((batch_size, n_hidden),
-                                             dtype=theano.config.floatX),
+                                           dtype=theano.config.floatX),
                                  borrow=True)
 
 # construct the RBM class
-rbm = RBM(input=x, n_visible=n_visible,
-          n_hidden=n_hidden, np_rng=rng, theano_rng=theano_rng)
+rbm = RBM(input=x, 
+          n_visible=n_visible,
+          n_hidden=n_hidden, 
+          np_rng=rng, 
+          theano_rng=theano_rng)
 
 # get the cost and the gradient corresponding to one step of CD-15
 cost, updates = rbm.get_cost_updates(lr=learning_rate,
-                                     persistent=persistent_chain, k=15)
+                                     persistent=persistent_chain, 
+                                     k=k)
 
 #################################
 #     Training the RBM          #
@@ -102,42 +89,26 @@ train_rbm = theano.function(
     cost,
     updates=updates,
     givens={
-        x: train_set_x[index * batch_size: (index + 1) * batch_size]
+        x: train_set[index * batch_size: (index + 1) * batch_size]
     },
     name='train_rbm'
 )
 
-#plotting_time = 0.
-#start_time = timeit.default_timer()
+plotting_time = 0.
+start_time = timeit.default_timer()
 # 
 ## go through training epochs
-#for epoch in xrange(training_epochs):
-#
-#    # go through the training set
-#    mean_cost = []
-#    for batch_index in xrange(n_train_batches):
-#        mean_cost += [train_rbm(batch_index)]
-#    print 'Training epoch %d, cost is ' % epoch, np.mean(mean_cost)
-#
-#    # Plot filters after each training epoch
-#    plotting_start = timeit.default_timer()
-#    # Construct image from the weight matrix
-#    image = Image.fromarray(
-#        tile_raster_images(
-#            X=rbm.W.get_value(borrow=True).T,
-#            img_shape=(28, 28),
-#            tile_shape=(10, 10),
-#            tile_spacing=(1, 1)
-#        )
-#    )
-#    image.save('filters_at_epoch_%i.png' % epoch)
-#    plotting_stop = timeit.default_timer()
-#    plotting_time += (plotting_stop - plotting_start)
-# 
-end_time = timeit.default_timer()
- 
+for epoch in xrange(training_epochs):
 
-pretraining_time = (end_time - start_time) #- plotting_time
+    # go through the training set
+    mean_cost = []
+    for batch_index in xrange(n_train_batches):
+        mean_cost += [train_rbm(batch_index)]
+    print 'Training epoch %d, cost is ' % epoch, np.mean(mean_cost)
+ 
+end_time = timeit.default_timer()
+
+pretraining_time = (end_time - start_time)
 
 print ('Training took %f minutes' % (pretraining_time / 60.))
 
@@ -145,14 +116,15 @@ print ('Training took %f minutes' % (pretraining_time / 60.))
 #################################
 #     Sampling from the RBM     #
 #################################
+
 # find out the number of test samples
-number_of_test_samples = test_set_x.get_value(borrow=True).shape[0]
+number_of_test_samples = test_set.get_value(borrow=True).shape[0]
 
 # pick random test examples, with which to initialize the persistent chain
 test_idx = rng.randint(number_of_test_samples - n_chains)
 persistent_vis_chain = theano.shared(
     np.asarray(
-        test_set_x.get_value(borrow=True)[test_idx:test_idx + n_chains],
+        test_set.get_value(borrow=True)[test_idx:test_idx + n_chains],
         dtype=theano.config.floatX
     )
 )
@@ -194,21 +166,4 @@ sample_fn = theano.function(
     name='sample_fn'
 )
 
-# create a space to store the image for plotting ( we need to leave
-# room for the tile_spacing as well)
-#image_data = np.zeros(
-#    (29 * n_samples + 1, 29 * n_chains - 1),
-#    dtype='uint8'
-#)
-#for idx in xrange(n_samples):
-#    # generate `plot_every` intermediate samples that we discard,
-#    # because successive samples in the chain are too correlated
-#    vis_mf, vis_sample = sample_fn()
-#    print ' ... plotting sample ', idx
-#    image_data[29 * idx:29 * idx + 28, :] = tile_raster_images(
-#        X=vis_mf,
-#        img_shape=(28, 28),
-#        tile_shape=(1, n_chains),
-#        tile_spacing=(1, 1)
-#    )
-
+# TODO: GENERATE NICE RECIPES (e.g. mash + nuts + garlic)
