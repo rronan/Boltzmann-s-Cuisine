@@ -13,7 +13,7 @@ to those without visible-visible and hidden-hidden connections.
 """
 import timeit
 
-import numpy as np
+import numpy
 
 import theano
 import theano.tensor as T
@@ -21,8 +21,8 @@ import os
 
 from theano.tensor.shared_randomstreams import RandomStreams
 
-from utils import tile_raster_images
-from logistic_sgd import load_data
+#from utils import tile_raster_images
+#from logistic_sgd import load_data
 
 
 # start-snippet-1
@@ -68,7 +68,7 @@ class RBM(object):
 
         if np_rng is None:
             # create a number generator
-            np_rng = np.random.RandomState(1234)
+            np_rng = numpy.random.RandomState(1234)
 
         if theano_rng is None:
             theano_rng = RandomStreams(np_rng.randint(2 ** 30))
@@ -79,10 +79,17 @@ class RBM(object):
             # 4*sqrt(6./(n_hidden+n_visible)) the output of uniform if
             # converted using asarray to dtype theano.config.floatX so
             # that the code is runable on GPU
-            initial_W = np.asarray(
+        
+            # Recurrent error at this line "AttributeError: 'TensorVariable' 
+            # object has no attribute 'sqrt'. I try to convert n_visible
+            # to int.
+        
+            # n_visible in a TensorVariable object, see:
+            # http://deeplearning.net/software/theano/library/tensor/basic.html
+            initial_W = numpy.asarray(
                 np_rng.uniform(
-                    low=-4 * np.sqrt(6. / (n_hidden + n_visible)),
-                    high=4 * np.sqrt(6. / (n_hidden + n_visible)),
+                    low=-4 * numpy.sqrt(6. / (n_hidden + n_visible)),
+                    high=4 * numpy.sqrt(6. / (n_hidden + n_visible)),
                     size=(n_visible, n_hidden)
                 ),
                 dtype=theano.config.floatX
@@ -93,7 +100,7 @@ class RBM(object):
         if hbias is None:
             # create shared variable for hidden units bias
             hbias = theano.shared(
-                value=np.zeros(
+                value=numpy.zeros(
                     n_hidden,
                     dtype=theano.config.floatX
                 ),
@@ -104,7 +111,7 @@ class RBM(object):
         if vbias is None:
             # create shared variable for visible units bias
             vbias = theano.shared(
-                value=np.zeros(
+                value=numpy.zeros(
                     n_visible,
                     dtype=theano.config.floatX
                 ),
@@ -392,12 +399,12 @@ def test_rbm(learning_rate=0.1, training_epochs=15,
     index = T.lscalar()    # index to a [mini]batch
     x = T.matrix('x')  # the data is presented as rasterized images
 
-    rng = np.random.RandomState(123)
+    rng = numpy.random.RandomState(123)
     theano_rng = RandomStreams(rng.randint(2 ** 30))
 
     # initialize storage for the persistent chain (state = hidden
     # layer of chain)
-    persistent_chain = theano.shared(np.zeros((batch_size, n_hidden),
+    persistent_chain = theano.shared(numpy.zeros((batch_size, n_hidden),
                                                  dtype=theano.config.floatX),
                                      borrow=True)
 
@@ -440,7 +447,7 @@ def test_rbm(learning_rate=0.1, training_epochs=15,
         for batch_index in xrange(n_train_batches):
             mean_cost += [train_rbm(batch_index)]
 
-        print 'Training epoch %d, cost is ' % epoch, np.mean(mean_cost)
+        print 'Training epoch %d, cost is ' % epoch, numpy.mean(mean_cost)
 
         # Plot filters after each training epoch
         plotting_start = timeit.default_timer()
@@ -472,7 +479,7 @@ def test_rbm(learning_rate=0.1, training_epochs=15,
     # pick random test examples, with which to initialize the persistent chain
     test_idx = rng.randint(number_of_test_samples - n_chains)
     persistent_vis_chain = theano.shared(
-        np.asarray(
+        numpy.asarray(
             test_set_x.get_value(borrow=True)[test_idx:test_idx + n_chains],
             dtype=theano.config.floatX
         )
@@ -516,7 +523,7 @@ def test_rbm(learning_rate=0.1, training_epochs=15,
 
     # create a space to store the image for plotting ( we need to leave
     # room for the tile_spacing as well)
-    image_data = np.zeros(
+    image_data = numpy.zeros(
         (29 * n_samples + 1, 29 * n_chains - 1),
         dtype='uint8'
     )
