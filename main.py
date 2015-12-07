@@ -28,6 +28,21 @@ n_samples=10
 output_folder='rbm_plots',
 n_hidden=20
 k=15
+do_report = True
+
+# Create a report to be saved at the end of execution (when running on the 
+# remote server)
+if do_report:
+    report = {"learning_rate":0.01,
+              "training_epochs":15,
+              "batch_size":20,
+              "n_chains":20,
+              "n_samples":10,
+              "output_folder":'rbm_plots',
+              "n_hidden":20,
+              "k":15,
+              "costs":np.zeros(training_epochs),
+              "pretraining_time":0}
 
 data = np.load('train_data.npy')
 n_labels = 20
@@ -111,6 +126,9 @@ for epoch in xrange(training_epochs):
     for batch_index in xrange(n_train_batches):
         mean_cost += [train_rbm(batch_index)]
     print 'Training epoch %d, cost is ' % epoch, np.mean(mean_cost)
+    if do_report:
+        report["costs"][epoch] = np.mean(mean_cost)
+        
  
 end_time = timeit.default_timer()
 
@@ -138,7 +156,9 @@ for i in range(len(test)):
     print pred, np.argmax(data[i,:20])
 
 
-
+if do_report:
+    np.save('report.csv', report)
+    
 #%%============================================================================
 # Sampling from the RBM
 #==============================================================================
