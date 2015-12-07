@@ -21,7 +21,7 @@ import random
 from theano.tensor.shared_randomstreams import RandomStreams
 
 learning_rate=0.01
-training_epochs=15
+training_epochs=1
 batch_size=20
 n_chains=20
 n_samples=10
@@ -30,6 +30,7 @@ n_hidden=20
 k=15
 
 data = np.load('train_data.npy')
+n_labels = 20
 
 n_visible = data.shape[1]
 
@@ -68,6 +69,7 @@ persistent_chain = theano.shared(np.zeros((batch_size, n_hidden),
 # construct the RBM class
 rbm = RBM(input=x, 
           n_visible=n_visible,
+          n_labels=n_labels,
           n_hidden=n_hidden, 
           np_rng=rng, 
           theano_rng=theano_rng)
@@ -76,10 +78,14 @@ rbm = RBM(input=x,
 cost, updates = rbm.get_cost_updates(lr=learning_rate,
                                      persistent=persistent_chain, 
                                      k=k)
+                                     
+# make a prediction for an unlablled sample.
+theano_unlabelled = T.matrix("unlabelled")
+label, confidence = rbm.predict(unlabelled)
 
-#################################
-#     Training the RBM          #
-#################################
+#%%============================================================================
+# Training the RBM
+#==============================================================================
 
 
 # it is ok for a theano function to have no output
@@ -96,7 +102,7 @@ train_rbm = theano.function(
 
 plotting_time = 0.
 start_time = timeit.default_timer()
-# 
+
 ## go through training epochs
 for epoch in xrange(training_epochs):
 
@@ -112,10 +118,30 @@ pretraining_time = (end_time - start_time)
 
 print ('Training took %f minutes' % (pretraining_time / 60.))
 
+#%%============================================================================
+# Classifying with the RBM
+#==============================================================================
 
-#################################
-#     Sampling from the RBM     #
-#################################
+# predict is used to label test samples.
+predict = theano.function(
+    [unlabelled],
+    (label,confidence),
+    givens={
+        theano_unlabelled: unlabelled
+    },
+    name='predict'    
+)
+
+test = data[:,20:]
+for i in range(len(test)):
+    pred = predict([test[i,:]])
+    print pred, np.argmax(data[i,:20])
+
+
+
+#%%============================================================================
+# Sampling from the RBM
+#==============================================================================
 
 # find out the number of test samples
 number_of_test_samples = test_set.get_value(borrow=True).shape[0]
