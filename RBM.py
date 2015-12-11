@@ -34,6 +34,7 @@ class RBM(object):
         n_labels,
         n_hidden,
         input=None,
+        validation=None,
         W=None,
         hbias=None,
         vbias=None,
@@ -215,20 +216,67 @@ class RBM(object):
         return [pre_sigmoid_h1, h1_mean, h1_sample,
                 pre_sigmoid_v1, v1_mean, v1_sample]
                 
-    def predict(self, v_unlabelled):
+#==============================================================================
+#     def compute_prob(self, v_unlabelled):
+#         ''' This function makes a prediction for an unlabelled sample,
+#         this is done by computing Z.P(v_unlablled,label) which is proportional
+#         to P(label|v_unlabelled).'''
+#         # Make the matrix made of unlabelled completed by all possible
+#         # labels.
+#         ones = theano.shared(numpy.eye(self.n_labels), name="ones", borrow=True)
+#         tiled = T.tile(v_unlabelled,[self.n_labels,1])
+#         full = T.concatenate((ones,tiled), axis=1)
+#         # Compute the probability of each labelled version.
+#         prob = T.exp(T.dot(full,self.vbias))
+#                 *T.prod(1+T.exp(T.dot(full,self.W) + self.hbias), axis=1)
+#         normed_prob = prob//T.sum(prob)
+#         return normed_prob
+#==============================================================================
+                        
+    def compute_prob(self, unlabelled):
         ''' This function makes a prediction for an unlabelled sample,
         this is done by computing Z.P(v_unlablled,label) which is proportional
         to P(label|v_unlabelled).'''
         # Make the matrix made of unlabelled completed by all possible
         # labels.
-        ones = theano.shared(numpy.eye(self.n_labels), name="ones", borrow=True)
-        tiled = T.tile(v_unlabelled,[self.n_labels,1])
-        full = T.concatenate((ones,tiled), axis=1)
+        n_samples = T.shape(unlabelled)[1]
+        #ones = numpy.repeat(numpy.eye(self.n_labels),n_samples,axis=0)
+        #ones.shape = (self.n_labels, n_samples, self.n_labels)
+        t_ones = theano.shared(numpy.eye(self.n_labels), name="ones", borrow=True)
+        r_ones = T.repeat(t_ones,n_samples,axis=0)
+        # TODO: Find a way to avoid that reshape.
+        r_ones = r_ones.reshape((self.n_labels,n_samples,self.n_labels))
+
+
+        #t_ones = theano.shared(ones, name="ones", borrow=True)
+        tiled = T.tile(unlabelled,[self.n_labels,1,1])
+        full = T.concatenate((r_ones,tiled), axis=2)
         # Compute the probability of each labelled version.
-        prob = T.exp(T.dot(full,self.vbias))*T.prod(T.exp(T.dot(full,self.W) + self.hbias), axis=1)
-        label = T.argmax(prob)
-        confidence = prob[label]/T.sum(prob)
-        return label, confidence
+        prob = T.exp(T.dot(full,self.vbias))    \
+                *T.prod(1+T.exp(T.dot(full,self.W) + self.hbias), axis=2)
+        # TODO: Try to avoid that transposition.
+        normed_prob = T.transpose(prob/T.sum(prob, axis=0))
+        return normed_prob
+        
+#==============================================================================
+#     def predict(self, normed_prob):
+#         ''' This function makes a prediction for an unlabelled sample,
+#         this is done by computing Z.P(v_unlablled,label) which is proportional
+#         to P(label|v_unlabelled).'''
+#         label = T.argmax(normed_prob)
+#         confidence = normed_prob[label]
+#         return label, confidence
+#==============================================================================
+                
+    def predict(self, unlabelled):
+        ''' This function makes a prediction for an unlabelled sample,
+        this is done by computing Z.P(v_unlablled,label) which is proportional
+        to P(label|v_unlabelled).'''
+        normed_prob = self.compute_prob(unlabelled)
+        labels = T.argmax(normed_prob,axis=1)
+        # TODO: find a way to do it like confidence = normed_prob[labels]
+        confidence = T.max(normed_prob,axis=1)
+        return labels, confidence
         
 
     def get_cost_updates(self, lr=0.1, persistent=None, k=1):
@@ -259,7 +307,6 @@ class RBM(object):
             chain_start = ph_sample
         else:
             chain_start = persistent
-        # end-snippet-2
         # perform actual negative phase
         # in order to implement CD-k/PCD-k we need to scan over the
         # function that implements one gibbs step k times.
@@ -291,9 +338,9 @@ class RBM(object):
 
         cost = T.mean(self.free_energy(self.input)) - T.mean(
             self.free_energy(chain_end))
-        # We must not compute the gradient through the gibbs sampling
+        # We must not compute the gradient through the gibbs sampling,
+        # only the RBM parameters.
         gparams = T.grad(cost, self.params, consider_constant=[chain_end])
-        # end-snippet-3 start-snippet-4
         # constructs the update dictionary
         for gparam, param in zip(gparams, self.params):
             # make sure that the learning rate is of the right dtype
@@ -383,3 +430,21 @@ class RBM(object):
 
         return cross_entropy
 
+#==============================================================================
+#     def get_cv_error(self):
+#         """Stochastic approximation to the pseudo-likelihood"""
+# 
+#         
+#         for i in range(len(self.validation)):
+#             
+# 
+# 
+#         # equivalent to e^(-FE(x_i)) / (e^(-FE(x_i)) + e^(-FE(x_{\i})))
+#         cost = T.mean(self.n_visible * T.log(T.nnet.sigmoid(fe_xi_flip -
+#                                                             fe_xi)))
+# 
+#         # increment bit_i_idx % number as part of updates
+#         updates[bit_i_idx] = (bit_i_idx + 1) % self.n_visible
+#         return cost
+#==============================================================================
+        

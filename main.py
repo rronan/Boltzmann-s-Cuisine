@@ -10,7 +10,7 @@ import timeit
 import numpy as np
 
 import theano
-#import theano.tensor as T
+import theano.tensor as T
 import os
 
 from RBM import RBM
@@ -26,7 +26,7 @@ batch_size=20
 n_chains=20
 n_samples=10
 output_folder='rbm_plots',
-n_hidden=20
+n_hidden=2
 k=15
 do_report = True
 
@@ -70,7 +70,7 @@ n_train_batches = train_set.get_value(borrow=True).shape[0] / batch_size
 
 # allocate symbolic variables for the data
 index = T.lscalar()  # index to a [mini]batch
-x = T.matrix('x')  # the data is presented as rasterized images
+x = T.matrix('x')  # the data
 
 rng = np.random.RandomState(123)
 theano_rng = RandomStreams(rng.randint(2 ** 30))
@@ -95,8 +95,8 @@ cost, updates = rbm.get_cost_updates(lr=learning_rate,
                                      k=k)
                                      
 # make a prediction for an unlablled sample.
-theano_unlabelled = T.matrix("unlabelled")
-label, confidence = rbm.predict(unlabelled)
+t_unlabelled = T.tensor3("unlabelled")
+label, confidence = rbm.predict(t_unlabelled)
 
 #%%============================================================================
 # Training the RBM
@@ -142,19 +142,13 @@ print ('Training took %f minutes' % (pretraining_time / 60.))
 
 # predict is used to label test samples.
 predict = theano.function(
-    [unlabelled],
-    (label,confidence),
-    givens={
-        theano_unlabelled: unlabelled
-    },
+    [t_unlabelled],
+    rbm.predict(t_unlabelled),
     name='predict'    
 )
 
 test = data[:,20:]
-for i in range(len(test)):
-    pred = predict([test[i,:]])
-    print pred, np.argmax(data[i,:20])
-
+pred = predict(numpy.array([test]))
 
 if do_report:
     np.save('report.csv', report)
