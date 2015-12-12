@@ -21,7 +21,7 @@ import random
 from theano.tensor.shared_randomstreams import RandomStreams
 
 learning_rate=0.01
-training_epochs=1
+training_epochs=10
 batch_size=20
 n_chains=20
 n_samples=10
@@ -33,15 +33,16 @@ do_report = True
 # Create a report to be saved at the end of execution (when running on the 
 # remote server)
 if do_report:
-    report = {"learning_rate":0.01,
-              "training_epochs":15,
-              "batch_size":20,
-              "n_chains":20,
-              "n_samples":10,
+    report = {"learning_rate":learning_rate,
+              "training_epochs":training_epochs,
+              "batch_size":batch_size,
+              "n_chains":n_chains,
+              "n_samples":n_samples,
               "output_folder":'rbm_plots',
-              "n_hidden":20,
-              "k":15,
+              "n_hidden":n_hidden,
+              "k":k,
               "costs":np.zeros(training_epochs),
+              "acc":np.zeros(training_epochs),
               "pretraining_time":0}
 
 data = np.load('train_data.npy')
@@ -57,13 +58,13 @@ random.seed(0)
 permutation = np.random.permutation(data.shape[0])
 
 test_idx = permutation[:test_n]
-test_set = data[test_idx,:]
+np_test_set = data[test_idx,:]
 
 train_idx = permutation[test_n:]
-train_set = data[train_idx,:]
+np_train_set = data[train_idx,:]
 
 # Building of theano format datasets
-train_set, test_set = load_data(train_set, test_set)
+train_set, test_set = load_data(np_train_set, np_test_set)
 
 # compute number of minibatches for training, validation and testing
 n_train_batches = train_set.get_value(borrow=True).shape[0] / batch_size
@@ -82,7 +83,8 @@ persistent_chain = theano.shared(np.zeros((batch_size, n_hidden),
                                  borrow=True)
 
 # construct the RBM class
-rbm = RBM(input=x, 
+rbm = RBM(input=x,
+          validation=test_set,
           n_visible=n_visible,
           n_labels=n_labels,
           n_hidden=n_hidden, 
@@ -93,6 +95,7 @@ rbm = RBM(input=x,
 cost, updates = rbm.get_cost_updates(lr=learning_rate,
                                      persistent=persistent_chain, 
                                      k=k)
+accuracy = rbm.get_cv_error()
                                      
 # make a prediction for an unlablled sample.
 t_unlabelled = T.tensor3("unlabelled")
@@ -125,9 +128,12 @@ for epoch in xrange(training_epochs):
     mean_cost = []
     for batch_index in xrange(n_train_batches):
         mean_cost += [train_rbm(batch_index)]
+    acc = accuracy.eval()
     print 'Training epoch %d, cost is ' % epoch, np.mean(mean_cost)
+    print 'Training epoch %d, accuracy is ' % epoch, acc
     if do_report:
         report["costs"][epoch] = np.mean(mean_cost)
+        report["accuracy"][epoch] = acc
         
  
 end_time = timeit.default_timer()
@@ -141,14 +147,13 @@ print ('Training took %f minutes' % (pretraining_time / 60.))
 #==============================================================================
 
 # predict is used to label test samples.
+# This is not needed only if we want to make predictions from numpy arrays.
 predict = theano.function(
     [t_unlabelled],
     rbm.predict(t_unlabelled),
     name='predict'    
 )
-
-test = data[:,20:]
-pred = predict(numpy.array([test]))
+#pred,conf = predict(numpy.array([np_test_set[:,20:]]))
 
 if do_report:
     np.save('report.csv', report)

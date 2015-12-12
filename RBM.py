@@ -129,6 +129,7 @@ class RBM(object):
         if not input:
             self.input = T.matrix('input')
 
+        self.validation = validation
         self.W = W
         self.hbias = hbias
         self.vbias = vbias
@@ -232,7 +233,7 @@ class RBM(object):
 #         normed_prob = prob//T.sum(prob)
 #         return normed_prob
 #==============================================================================
-                        
+
     def compute_prob(self, unlabelled):
         ''' This function makes a prediction for an unlabelled sample,
         this is done by computing Z.P(v_unlablled,label) which is proportional
@@ -430,21 +431,10 @@ class RBM(object):
 
         return cross_entropy
 
-#==============================================================================
-#     def get_cv_error(self):
-#         """Stochastic approximation to the pseudo-likelihood"""
-# 
-#         
-#         for i in range(len(self.validation)):
-#             
-# 
-# 
-#         # equivalent to e^(-FE(x_i)) / (e^(-FE(x_i)) + e^(-FE(x_{\i})))
-#         cost = T.mean(self.n_visible * T.log(T.nnet.sigmoid(fe_xi_flip -
-#                                                             fe_xi)))
-# 
-#         # increment bit_i_idx % number as part of updates
-#         updates[bit_i_idx] = (bit_i_idx + 1) % self.n_visible
-#         return cost
-#==============================================================================
+    def get_cv_error(self):
+        """Stochastic approximation to the pseudo-likelihood"""
+        validation_3d = (self.validation[:,self.n_labels:]).reshape((1,T.shape(self.validation)[0],T.shape(self.validation)[1]-self.n_labels))
+        labels,confidence = self.predict(validation_3d)
+        accuracy = (1.0*T.shape(self.validation)[0] - T.shape(T.nonzero(labels - T.argmax(self.validation[:,:self.n_labels], axis=1)))[1]) / T.shape(self.validation)[0]
+        return accuracy
         
