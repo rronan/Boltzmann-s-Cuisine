@@ -56,10 +56,10 @@ test_n = int(data.shape[0]/n_fold)
 random.seed(0)
 permutation = np.random.permutation(data.shape[0])
 
-test_idx = permutation[range(test_n)]
+test_idx = permutation[:test_n]
 test_set = data[test_idx,:]
 
-train_idx = permutation[-np.array(range(test_n))]
+train_idx = permutation[test_n:]
 train_set = data[train_idx,:]
 
 # Building of theano format datasets
