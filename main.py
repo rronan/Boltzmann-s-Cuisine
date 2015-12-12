@@ -151,7 +151,7 @@ test = data[:,20:]
 pred = predict(numpy.array([test]))
 
 if do_report:
-    np.save('report.csv', report)
+    np.save('report', report)
     
 #%%============================================================================
 # Sampling from the RBM
