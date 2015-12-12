@@ -156,7 +156,7 @@ predict = theano.function(
 #pred,conf = predict(numpy.array([np_test_set[:,20:]]))
 
 if do_report:
-    np.save('report.csv', report)
+    np.save('report', report)
     
 #%%============================================================================
 # Sampling from the RBM
