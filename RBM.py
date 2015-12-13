@@ -138,6 +138,21 @@ class RBM(object):
         # other than shared variables created in this function.
         self.params = [self.W, self.hbias, self.vbias]
         # end-snippet-1
+        
+    def clone(self, rbm_object):
+        
+        self.n_visible = rbm_object.n_visible
+        self.n_labels = rbm_object.n_labels
+        self.n_hidden = rbm_object.n_hidden
+        self.input = rbm_object.input
+        self.validation = rbm_object.validation
+        self.W = rbm_object.W
+        self.hbias = rbm_object.hbias
+        self.vbias = rbm_object.vbias
+        self.theano_rng = rbm_object.theano_rng
+        # **** WARNING: It is not a good idea to put things in this list
+        # other than shared variables created in this function.
+        self.params = [self.W, self.hbias, self.vbias]
 
     def free_energy(self, v_sample):
         ''' Function to compute the free energy '''
@@ -224,7 +239,9 @@ class RBM(object):
 #         to P(label|v_unlabelled).'''
 #         # Make the matrix made of unlabelled completed by all possible
 #         # labels.
-#         ones = theano.shared(numpy.eye(self.n_labels), name="ones", borrow=True)
+#         ones = theano.shared(numpy.eye(self.n_labels), 
+#                              name="ones", 
+#                              borrow=True)
 #         tiled = T.tile(v_unlabelled,[self.n_labels,1])
 #         full = T.concatenate((ones,tiled), axis=1)
 #         # Compute the probability of each labelled version.
