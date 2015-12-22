@@ -11,10 +11,9 @@ import numpy as np
 
 import theano
 import theano.tensor as T
-import os
 
 from RBM import RBM
-from load_data import *
+from load_data import load_data
 
 import random
 
@@ -25,7 +24,7 @@ training_epochs=10
 batch_size=20
 n_chains=20
 n_samples=10
-output_folder='rbm_plots',
+output_folder='rbm_plots'
 n_hidden=2
 k=15
 do_report = True
@@ -42,10 +41,14 @@ if do_report:
               "n_hidden":n_hidden,
               "k":k,
               "costs":np.zeros(training_epochs),
-              "acc":np.zeros(training_epochs),
+              "accuracy":np.zeros(training_epochs),
               "pretraining_time":0}
 
 data = np.load('train_data.npy')
+
+X = data[:,20:]
+Y = data[:,:20]
+
 n_labels = 20
 
 n_visible = data.shape[1]
