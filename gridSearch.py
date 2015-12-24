@@ -189,7 +189,7 @@ for current_params in param_grid:
                 report["accuracy"][epoch] = acc
      
     hyper_scores[i] = max_score
-    i +=1
+    i += 1
     
     end_time = timeit.default_timer()
     
@@ -199,13 +199,15 @@ for current_params in param_grid:
     
     if do_report:
         try:
-            np.save(report_folder+'/'+report_name+'_i', report)
-        except OSError:
+            np.save(report_folder+'/'+report_name+'_'+i, report)
+        except OSError, IOError:
             os.mkdir(report_folder)
-            np.save(report_folder+'/'+report_name+'_i', report)
+            np.save(report_folder+'/'+report_name+'_'+i, report)
             
 
 np.save(report_folder+'/hyper_scores', hyper_scores)          
             
 best_params = param_grid[np.argmax(hyper_scores)]
 np.save(report_folder+'/best_params', best_params)
+
+
