@@ -28,13 +28,12 @@ report_name='report'
 scoring='accuracy'
 do_report = True
 
-params = {'learning_rate':[0.01],
-          'training_epochs':[10],
+params = {'learning_rate':[0.1, 0.01, 0.001],
+          'training_epochs':[50],
           'batch_size':[20],
           'n_chains':[20],
-          'n_samples':[10],
-          'n_hidden':[2],
-          'k':[5, 15]}
+          'n_hidden':[20, 200, 2000],
+          'k':[5]}
 
 param_grid = list(ParameterGrid(params))
 
@@ -48,7 +47,6 @@ for current_params in param_grid:
     training_epochs = current_params['training_epochs']      
     batch_size = current_params['batch_size']
     n_chains = current_params['n_chains']
-    n_samples = current_params['n_samples']
     n_hidden = current_params['n_hidden']
     k = current_params['k']
     
@@ -59,7 +57,6 @@ for current_params in param_grid:
                   "training_epochs":training_epochs,
                   "batch_size":batch_size,
                   "n_chains":n_chains,
-                  "n_samples":n_samples,
                   "n_hidden":n_hidden,
                   "k":k,
                   "costs":np.zeros(training_epochs),
