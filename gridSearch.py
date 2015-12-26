@@ -28,11 +28,14 @@ report_name='report'
 scoring='accuracy'
 do_report = True
 
-params = {'learning_rate':[0.1, 0.01, 0.001],
-          'training_epochs':[50],
+# number of epochs allowed without increasing of accuracy
+increasing_constraint = 3
+
+params = {'learning_rate':[0.05, 0.01],
+          'training_epochs':[150],
           'batch_size':[20],
           'n_chains':[20],
-          'n_hidden':[20, 200, 2000],
+          'n_hidden':[200, 400],
           'k':[5]}
 
 param_grid = list(ParameterGrid(params))
@@ -181,7 +184,7 @@ for current_params in param_grid:
             else:
                 count += 1
             
-            if count>2:
+            if count>=increasing_constraint:
                 break
                 
             if do_report:
