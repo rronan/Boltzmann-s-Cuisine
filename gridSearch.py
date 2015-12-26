@@ -201,16 +201,12 @@ for current_params in param_grid:
     print ('Training took %f minutes' % (pretraining_time / 60.))
     
     if do_report:
-        try:
-            np.save(report_folder+'/'+report_name+'_'+i, report)
-        except OSError, IOError:
-            os.mkdir(report_folder)
-            np.save(report_folder+'/'+report_name+'_'+i, report)
+        np.save('reports/'+report_name+'_'+str(i), report)
             
 
-np.save(report_folder+'/hyper_scores', hyper_scores)          
+np.save('reports/hyper_scores', hyper_scores)          
             
 best_params = param_grid[np.argmax(hyper_scores)]
-np.save(report_folder+'/best_params', best_params)
+np.save('reports/best_params', best_params)
 
 
