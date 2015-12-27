@@ -13,6 +13,8 @@ to those without visible-visible and hidden-hidden connections.
 
 import numpy
 
+from scipy.special import expit
+
 
 class RBM(object):
     """Restricted Boltzmann Machine (RBM)  """
@@ -134,19 +136,21 @@ class RBM(object):
         optimizations, this symbolic variable will be needed to write
         down a more stable computational graph (see details in the
         reconstruction cost function)
+        
+        NOTE: I STILL RETURN THE TWO QUANTITIES FOR THE MOMENT
 
         '''
-        pre_sigmoid_activation = T.dot(vis, self.W) + self.hbias
-        return [pre_sigmoid_activation, T.nnet.sigmoid(pre_sigmoid_activation)]
+        pre_sigmoid_activation = numpy.dot(vis, self.W) + self.hbias
+        
+        return [pre_sigmoid_activation, expit(pre_sigmoid_activation)]
 
     def sample_h_given_v(self, v0_sample):
         ''' This function infers state of hidden units given visible units '''
-        # compute the activation of the hidden units given a sample of
-        # the visibles
         
-        # get a sample of the hiddens given their activation
-
+        pre_sigmoid_h1, h1_mean = self.propup(v0_sample)
+        h1_sample = numpy.random.binomial(size=h1_mean.shape, n=1, p=h1_mean)
         
+        return [pre_sigmoid_h1, h1_mean, h1_sample]        
 
 
     def propdown(self, hid):
@@ -158,26 +162,36 @@ class RBM(object):
         optimizations, this symbolic variable will be needed to write
         down a more stable computational graph (see details in the
         reconstruction cost function)
+        
+        NOTE: I STILL RETURN THE TWO QUANTITIES FOR THE MOMENT
 
         '''
-        pre_sigmoid_activation = T.dot(hid, self.W.T) + self.vbias
-        return [pre_sigmoid_activation, T.nnet.sigmoid(pre_sigmoid_activation)]
+        pre_sigmoid_activation = numpy.dot(hid, self.W.T) + self.vbias
+        
+        return [pre_sigmoid_activation, expit(pre_sigmoid_activation)]
 
     def sample_v_given_h(self, h0_sample):
         ''' This function infers state of visible units given hidden units '''
-        # compute the activation of the visible given the hidden sample
         
-        # get a sample of the visible given their activation
+        pre_sigmoid_v1, v1_mean = self.propdown(h0_sample)
+        v1_sample = numpy.random.binomial(size=v1_mean.shape, n=1, p=v1_mean)
+        
+        return [pre_sigmoid_v1, v1_mean, v1_sample]
 
 
     def gibbs_hvh(self, h0_sample):
-        ''' This function implements one step of Gibbs sampling,
-            starting from the hidden state'''
-
+        pre_sigmoid_v1, v1_mean, v1_sample = self.sample_v_given_h(h0_sample)
+        pre_sigmoid_h1, h1_mean, h1_sample = self.sample_h_given_v(v1_sample)
+        return [pre_sigmoid_v1, v1_mean, v1_sample,
+                pre_sigmoid_h1, h1_mean, h1_sample]
 
     def gibbs_vhv(self, v0_sample):
         ''' This function implements one step of Gibbs sampling,
             starting from the visible state'''
+        pre_sigmoid_h1, h1_mean, h1_sample = self.sample_h_given_v(v0_sample)
+        pre_sigmoid_v1, v1_mean, v1_sample = self.sample_v_given_h(h1_sample)
+        return [pre_sigmoid_h1, h1_mean, h1_sample,
+                pre_sigmoid_v1, v1_mean, v1_sample]
 
 
 
