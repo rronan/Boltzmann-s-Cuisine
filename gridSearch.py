@@ -21,21 +21,19 @@ from theano.tensor.shared_randomstreams import RandomStreams
 
 from sklearn.grid_search import ParameterGrid
 
-import os
-
 report_folder='reports'
 report_name='report'
 scoring='accuracy'
 do_report = True
 
 # number of epochs allowed without increasing of accuracy
-increasing_constraint = 3
+increasing_constraint = 20
 
 params = {'learning_rate':[0.05, 0.01],
-          'training_epochs':[150],
+          'training_epochs':[300],
           'batch_size':[20],
           'n_chains':[20],
-          'n_hidden':[200, 400],
+          'n_hidden':[200, 400, 1000],
           'k':[5]}
 
 param_grid = list(ParameterGrid(params))
