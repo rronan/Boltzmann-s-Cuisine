@@ -11,10 +11,8 @@ contain hidden variables. Restricted Boltzmann Machines further restrict BMs
 to those without visible-visible and hidden-hidden connections.
 """
 
-import numpy
+import numpy as np
 
-def sigmoid(x):
-    return 1 / (1 + np.exp(-x))
 
 class RBM(object):
     """Restricted Boltzmann Machine (RBM)  """
@@ -184,23 +182,41 @@ class RBM(object):
 
 
 
-    def compute_prob(self, unlabelled):
-        ''' This function makes a prediction for an unlabelled sample,
-        this is done by computing Z.P(v_unlablled,label) which is proportional
-        to P(label|v_unlabelled).'''
-
+    def build_prediction_base(self, test_set):
+        self.test_labels = np.argmax(test_set[:, :self.n_labels], axis=1)
+        possible_labels = np.repeat(np.eye(self.n_labels), len(test_set[:,self.n_labels:]), axis=0)
+        possible_labels.shape = (self.n_labels,  len(test_set[:,self.n_labels:]), self.n_labels)
+        tiled_test_set = np.tile(test_set[:,self.n_labels:],(1,self.n_labels,1))
+        tiled_test_set.shape = (self.n_labels,  len(test_set[:,self.n_labels:]), len(test_set[:,self.n_labels:][0]))
+        self.prediction_base = np.concatenate((possible_labels, tiled_test_set), axis=2)
+        
         
                 
-    def predict(self, unlabelled):
+    def predict(self):
         ''' This function makes a prediction for an unlabelled sample,
         this is done by computing Z.P(v_unlablled,label) which is proportional
         to P(label|v_unlabelled).'''
-        normed_prob = self.compute_prob(unlabelled)
-        labels = T.argmax(normed_prob,axis=1)
-        # TODO: find a way to do it like confidence = normed_prob[labels]
-        confidence = T.max(normed_prob,axis=1)
-        return labels, confidence
+        '''
+        P(vlabel|vdata) = P(vlabel, vdata) / P(vdata)
+                          = P(vlabel, vdata) / Sum_{vlabel'} P(vlabel', vdata)
+                          = Prod_j exp(vbias_j*v_j) * Prod(1+exp(c_i + (Wv)_i))
+                            / Sum_{vlabel'} Prod_j exp(vbias_j*v'_j) * Prod(1+exp(c_i + (Wv')_i))
+                          = exp(hbias_label) * Prod(1+exp(c_i + (Wv)_i))
+                            / Sum_{vlabel'} exp(hbias_label') * Prod(1+exp(c_i + (Wv')_i))
+                   prop. to exp(hbias_label) * Prod(1+exp(c_i + (Wv)_i))
+        '''
+        
+        # It may be needed use log of probabilities.
+        p =  np.einsum('ij,i->ij',np.prod(1 + np.exp(self.hbias + np.dot(self.prediction_base,self.W)), axis=2),np.exp(self.vbias[:self.n_labels])) 
+        labels = np.argmax(p, axis=0)   
+        # TODO: find a way to do it like confidence = p[labels]
+        # p = p / np.sum(p)
+        # confidence = np.max(p, axis=0)
+        return labels
 
+
+    def cv_accuracy(self):
+        np.sum(self.predict() == self.test_labels)/len(self.test_labels)
 
 
     def update(self, batch, persistent=False, lr=0.1, k=1):
@@ -208,23 +224,16 @@ class RBM(object):
 
         :param lr: learning rate used to train the RBM
 
-        :param persistent: None for CD. For PCD, shared variable
-            containing old state of Gibbs chain. This must be a shared
-            variable of size (batch size, number of hidden units).
+        :param persistent: False for CD, true for PCD.
 
         :param k: number of Gibbs steps to do in CD-k/PCD-k
-
-        Returns a proxy for the cost and the updates dictionary. The
-        dictionary contains the update rules for weights and biases but
-        also an update of the shared variable used to store the persistent
-        chain, if one is used.
 
         """
 
         # compute positive phase
         
         for i in len(batch):
-            v0 = batch[i,:]
+            v0 = batch[i,:,:]
             # decide how to initialize persistent chain:
             # for CD, we use the sample
             # for PCD, we initialize from the old state of the chain
@@ -235,21 +244,19 @@ class RBM(object):
                 
             # Gibbs sampling
             for i in range(k):
-                vk = gibbs_vhv(vk)
+                vk = self.gibbs_vhv(vk)
     
             # determine gradients on RBM parameters
             phv0 = sigmoid(np.dot(self.W, v0) + self.hbias) 
             phvk = sigmoid(np.dot(self.W, vk) + self.hbias) 
             self.W += lr*(np.outer(v0, phv0) - np.outer(vk, phvk))
             self.vbias += lr*(v0 - vk)
-            self.hbias += lr*(phv0 - phv)
+            self.hbias += lr*(phv0 - phvk)
 
 
         if persistent:
             # Note that this works only if persistent is a shared variable
             self.persistent[i,:,:] = vk
 
-
-    def get_cv_error(self):
 
         
