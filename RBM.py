@@ -13,6 +13,8 @@ to those without visible-visible and hidden-hidden connections.
 
 import numpy
 
+def sigmoid(x):
+    return 1 / (1 + np.exp(-x))
 
 class RBM(object):
     """Restricted Boltzmann Machine (RBM)  """
@@ -109,6 +111,7 @@ class RBM(object):
         self.W = W
         self.hbias = hbias
         self.vbias = vbias
+        self.persistent = None
 
         
     def clone(self, rbm_object):
@@ -200,7 +203,7 @@ class RBM(object):
 
 
 
-    def get_cost_updates(self, lr=0.1, persistent=None, k=1):
+    def update(self, batch, persistent=False, lr=0.1, k=1):
         """This functions implements one step of CD-k or PCD-k
 
         :param lr: learning rate used to train the RBM
@@ -219,40 +222,32 @@ class RBM(object):
         """
 
         # compute positive phase
-        pre_sigmoid_ph, ph_mean, ph_sample = self.sample_h_given_v(self.input)
-
-        # decide how to initialize persistent chain:
-        # for CD, we use the newly generate hidden sample
-        # for PCD, we initialize from the old state of the chain
-        if persistent is None:
-            chain_start = ph_sample
-        else:
-            chain_start = persistent
-        # perform actual negative phase
-
-
-
-        # determine gradients on RBM parameters
-        # note that we only need the sample at the end of the chain
-
-
-        # We must not compute the gradient through the gibbs sampling,
-        # only the RBM parameters.
-        gparams = T.grad(cost, self.params, consider_constant=[chain_end])
+        
+        for i in len(batch):
+            v0 = batch[i,:]
+            # decide how to initialize persistent chain:
+            # for CD, we use the sample
+            # for PCD, we initialize from the old state of the chain
+            if self.persistent is None:
+                vk = v0
+            else:
+                vk = self.persistent[i,:,:]
+                
+            # Gibbs sampling
+            for i in range(k):
+                vk = gibbs_vhv(vk)
+    
+            # determine gradients on RBM parameters
+            phv0 = sigmoid(np.dot(self.W, v0) + self.hbias) 
+            phvk = sigmoid(np.dot(self.W, vk) + self.hbias) 
+            self.W += lr*(np.outer(v0, phv0) - np.outer(vk, phvk))
+            self.vbias += lr*(v0 - vk)
+            self.hbias += lr*(phv0 - phv)
 
 
         if persistent:
             # Note that this works only if persistent is a shared variable
-            updates[persistent] = nh_samples[-1]
-        # pseudo-likelihood
-        monitoring_cost = self.get_pseudo_likelihood_cost(updates)
-
-        return monitoring_cost
-
-
-    def get_pseudo_likelihood_cost(self, updates):
-        """Stochastic approximation to the pseudo-likelihood"""
-
+            self.persistent[i,:,:] = vk
 
 
     def get_cv_error(self):
