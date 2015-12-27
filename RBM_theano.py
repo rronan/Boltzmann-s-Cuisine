@@ -296,6 +296,25 @@ class RBM(object):
         confidence = T.max(normed_prob,axis=1)
         return labels, confidence
         
+    def predict_one(self, v_unlabelled):
+        ''' This function makes a prediction for an unlabelled sample,
+        this is done by computing Z.P(v_unlablled,label) which is proportional
+        to P(label|v_unlabelled).'''
+        # Make the matrix made of unlabelled completed by all possible
+        # labels.
+        ones = theano.shared(numpy.eye(self.n_labels), name="ones", borrow=True)
+        tiled = T.tile(v_unlabelled,[self.n_labels,1])
+        full = T.concatenate((ones,tiled), axis=1)
+        # Compute the probability of each labelled version.
+        prob = T.exp(T.dot(full,self.vbias))*T.prod(1+T.exp(T.dot(full,self.W) + self.hbias), axis=1)
+        log_prob = (T.dot(full,self.vbias))+T.sum(T.log(1+T.exp(T.dot(full,self.W) + self.hbias)), axis=1)
+        log_prob = log_prob - T.mean(log_prob)
+        prob = T.exp(log_prob)
+        label = T.argmax(log_prob)
+        confidence = prob[label]/T.sum(prob)
+        return label, confidence
+
+
 
     def get_cost_updates(self, lr=0.1, persistent=None, k=1):
         """This functions implements one step of CD-k or PCD-k
@@ -449,6 +468,13 @@ class RBM(object):
         return cross_entropy
 
     def get_cv_error(self):
+        """Stochastic approximation to the pseudo-likelihood"""
+        validation_3d = (self.validation[:,self.n_labels:]).reshape((1,T.shape(self.validation)[0],T.shape(self.validation)[1]-self.n_labels))
+        labels,confidence = self.predict(validation_3d)
+        accuracy = (1.0*T.shape(self.validation)[0] - T.shape(T.nonzero(labels - T.argmax(self.validation[:,:self.n_labels], axis=1)))[1]) / T.shape(self.validation)[0]
+        return accuracy
+        
+    def get_cv_error_one(self):
         """Stochastic approximation to the pseudo-likelihood"""
         validation_3d = (self.validation[:,self.n_labels:]).reshape((1,T.shape(self.validation)[0],T.shape(self.validation)[1]-self.n_labels))
         labels,confidence = self.predict(validation_3d)
