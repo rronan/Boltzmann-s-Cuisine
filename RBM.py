@@ -13,8 +13,8 @@ to those without visible-visible and hidden-hidden connections.
 
 import numpy as np
 
-from scipy.special import expit
-
+def sigmoid(x):
+    return 1/(1+np.exp(-x))
 
 class RBM(object):
     """Restricted Boltzmann Machine (RBM)  """
@@ -24,6 +24,7 @@ class RBM(object):
         n_labels,
         n_hidden,
         batch_size,
+        dropout_rate=0.0,
         W=None,
         hbias=None,
         vbias=None,
@@ -59,6 +60,7 @@ class RBM(object):
         self.n_labels = n_labels
         self.n_hidden = n_hidden
         self.batch_size = batch_size
+        self.dropout_rate = dropout_rate
 
         if np_rng is None:
             # create a number generator
@@ -109,30 +111,36 @@ class RBM(object):
         self.vbias = rbm_object.vbias
         
 
-    def propup(self, v):
+    def propup(self, v, r):
         '''This function propagates the visible units activation upwards to
         the hidden units
         '''
-        return expit(np.dot(v, self.W) + self.hbias)
+        return r*sigmoid(np.dot(v, self.W) + self.hbias)
 
 
-    def sample_h_given_v(self, v):
-        ''' This function infers state of hidden units given visible units '''
-        h_mean = self.propup(v)
-        return np.random.binomial(size=h_mean.shape, n=1, p=h_mean)       
+    def sample_h_given_v(self, v, r):
+        ''' This function infers state of hidden units given visible units.
+            Dropout is applied.
+            Using rand() instead of binomial() gives a x10 speedup because
+            it is faster to sample iid rv.'''
+        h_mean = self.propup(v, r)
+        return (np.random.rand(len(h_mean)) < h_mean).astype(float)
 
 
     def propdown(self, h):
         '''This function propagates the hidden units activation downwards to
         the visible units
         '''
-        return expit(np.dot(h, self.W.T) + self.vbias)
+        return sigmoid(np.dot(h, self.W.T) + self.vbias)
 
+    # TODO: Use softmax for generating the label
+    def sample_v_given_h(self, h):
+        ''' This function infers state of visible units given hidden units.
+            Using rand() instead of binomial() gives a x10 speedup because
+            it is faster to sample iid rv.'''
+        v_mean = self.propdown(h)
+        return (np.random.rand(len(v_mean)) < v_mean).astype(float)
 
-    def sample_v_given_h(self, h0_sample):
-        ''' This function infers state of visible units given hidden units '''
-        v_mean = self.propdown(h0_sample)
-        return np.random.binomial(size=v_mean.shape, n=1, p=v_mean)
 
 
     def gibbs_hvh(self, h):
@@ -140,10 +148,10 @@ class RBM(object):
         return self.sample_h_given_v(v)
 
 
-    def gibbs_vhv(self, v):
+    def gibbs_vhv(self, v, r):
         ''' This function implements one step of Gibbs sampling,
             starting from the visible state'''
-        h = self.sample_h_given_v(v)
+        h = self.sample_h_given_v(v, r)
         return self.sample_v_given_h(h)
 
     
@@ -199,6 +207,56 @@ class RBM(object):
         for i in range(len(test_set)):
             count += (np.argmax(test_set[i,:self.n_labels]) == self.predict_one(test_set[i,:]))
         return float(count)/len(test_set)
+#==============================================================================
+# 
+#     def update(self, batch, persistent=False, lr=0.1, k=1):
+#         """This functions implements one step of CD-k or PCD-k
+# 
+#         :param lr: learning rate used to train the RBM
+# 
+#         :param persistent: False for CD, true for PCD.
+# 
+#         :param k: number of Gibbs steps to do in CD-k/PCD-k
+# 
+#         """
+#         if persistent:
+#             if self.persistent == None:
+#                 self.persistent = np.copy(batch)
+#                 
+#         if self.persistent is None:
+#             batch_k = np.copy(batch)
+#         else:
+#             batch_k = np.copy(self.persistent)
+#         
+#                 
+#         for i in range(len(batch)):
+#             v0 = batch[i,:]
+#             # decide how to initialize persistent chain:
+#             # for CD, we use the sample
+#             # for PCD, we initialize from the old state of the chain
+# #==============================================================================
+# #             if self.persistent is None:
+# #                 vk = v0
+# #             else:
+# #                 vk = self.persistent[i,:]
+# #==============================================================================
+#                 
+#                 
+#             # Gibbs sampling
+#             for j in range(k):
+#                 batch_k[i,:] = self.gibbs_vhv(np.copy(batch_k[i,:]))
+#             vk = batch_k[i,:].astype(float)
+#     
+#             # determine gradients on RBM parameters
+#             phv0 = sigmoid(np.dot(v0, self.W) + self.hbias) 
+#             phvk = sigmoid(np.dot(vk, self.W) + self.hbias) 
+#             self.W += lr*(np.outer(v0, phv0) - np.outer(vk, phvk))
+#             self.vbias += lr*(v0 - vk)
+#             self.hbias += lr*(phv0 - phvk)
+#            if persistent:
+#                self.persistent[i,:] = vk
+#==============================================================================
+
 
     def update(self, batch, persistent=False, lr=0.1, k=1):
         """This functions implements one step of CD-k or PCD-k
@@ -210,33 +268,34 @@ class RBM(object):
         :param k: number of Gibbs steps to do in CD-k/PCD-k
 
         """
-        for i in range(len(batch)):
-            v0 = batch[i,:]
-            # decide how to initialize persistent chain:
-            # for CD, we use the sample
-            # for PCD, we initialize from the old state of the chain
-            if self.persistent is None:
-                vk = v0
-            else:
-                vk = self.persistent[i,:]
+        if persistent and self.persistent == None:
+            self.persistent = batch.astype(float) # astype produces a deep copy.
                 
-            # Gibbs sampling
-            for i in range(k):
-                vk = self.gibbs_vhv(vk)
-    
-            # determine gradients on RBM parameters
-            phv0 = expit(np.dot(v0, self.W) + self.hbias) 
-            phvk = expit(np.dot(vk, self.W) + self.hbias) 
-            self.W += lr*(np.outer(v0, phv0) - np.outer(vk, phvk))
-            self.vbias += lr*(v0 - vk)
-            self.hbias += lr*(phv0 - phvk)
-
-
-        if persistent:
-            if self.persistent == None:
-                self.persistent = np.zeros((self.batch_size, self.n_visible), dtype=float)
-            # Note that this works only if persistent is a shared variable
-            self.persistent[i,:] = vk
-
-
+        # decide how to initialize persistent chain:
+        # for CD, we use the sample
+        # for PCD, we initialize from the old state of the chain
+        if self.persistent is None:
+            batch_k = batch.astype(float) # astype produces a deep copy.
+        else:
+            batch_k = persistent # shallow copy.
         
+        # Draw dropout.
+        dropout = np.random.binomial(size=(self.batch_size, self.n_hidden), n=1, p=(1-self.dropout_rate))        
+        
+        # Gibbs sampling
+        # TODO: Vectorize sampling.
+        for i in range(len(batch)):
+            for j in range(k):
+                batch_k[i,:] = self.gibbs_vhv(batch_k[i,:], dropout[i,:])
+    
+        # determine gradients on RBM parameters
+        h_mean_0 = self.propup(batch, dropout)
+        h_mean_k = self.propup(batch_k, dropout)
+        self.W += lr*(np.dot(batch.T, h_mean_0) - np.dot(batch_k.T, h_mean_k))/self.batch_size
+        self.vbias += lr*(np.mean(batch, axis=0) - np.mean(batch_k, axis=0))
+        self.hbias += lr*(np.mean(h_mean_0, axis=0) - np.mean(h_mean_k, axis=0))
+        if persistent:
+            self.persistent = batch_k # shallow copy.
+
+
+
