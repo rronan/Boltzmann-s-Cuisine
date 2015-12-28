@@ -124,7 +124,7 @@ class RBM(object):
             Using rand() instead of binomial() gives a x10 speedup because
             it is faster to sample iid rv.'''
         h_mean = self.propup(v, r)
-        return (np.random.rand(len(h_mean)) < h_mean).astype(float)
+        return (np.random.uniform(size=h_mean.shape) < h_mean).astype(float)
 
 
     def propdown(self, h):
@@ -139,18 +139,22 @@ class RBM(object):
             Using rand() instead of binomial() gives a x10 speedup because
             it is faster to sample iid rv.'''
         v_mean = self.propdown(h)
-        return (np.random.rand(len(v_mean)) < v_mean).astype(float)
+        return (np.random.uniform(size=v_mean.shape) < v_mean).astype(float)
 
 
 
     def gibbs_hvh(self, h):
+        ''' This function implements one step of Gibbs sampling,
+            starting from the hidden state.
+            Can be used on batches.'''
         v = self.sample_v_given_h(h)
         return self.sample_h_given_v(v)
 
 
     def gibbs_vhv(self, v, r):
         ''' This function implements one step of Gibbs sampling,
-            starting from the visible state'''
+            starting from the visible state.
+            Can be used on batches.'''
         h = self.sample_h_given_v(v, r)
         return self.sample_v_given_h(h)
 
@@ -283,10 +287,8 @@ class RBM(object):
         dropout = np.random.binomial(size=(self.batch_size, self.n_hidden), n=1, p=(1-self.dropout_rate))        
         
         # Gibbs sampling
-        # TODO: Vectorize sampling.
-        for i in range(len(batch)):
-            for j in range(k):
-                batch_k[i,:] = self.gibbs_vhv(batch_k[i,:], dropout[i,:])
+        for j in range(k):
+            batch_k = self.gibbs_vhv(batch_k, dropout)
     
         # determine gradients on RBM parameters
         h_mean_0 = self.propup(batch, dropout)
