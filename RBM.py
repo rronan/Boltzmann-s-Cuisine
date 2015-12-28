@@ -15,6 +15,10 @@ import numpy as np
 
 def sigmoid(x):
     return 1/(1+np.exp(-x))
+    
+def softmax(x):
+    exp = np.exp(x)
+    return exp / np.sum(exp, axis=1)[:,None]
 
 class RBM(object):
     """Restricted Boltzmann Machine (RBM)  """
@@ -131,15 +135,23 @@ class RBM(object):
         '''This function propagates the hidden units activation downwards to
         the visible units
         '''
-        return sigmoid(np.dot(h, self.W.T) + self.vbias)
+        pre_activation = np.dot(h, self.W.T) + self.vbias
+        return softmax(pre_activation[:,:self.n_labels]), sigmoid(pre_activation[:,self.n_labels:])
+        
 
     # TODO: Use softmax for generating the label
     def sample_v_given_h(self, h):
         ''' This function infers state of visible units given hidden units.
             Using rand() instead of binomial() gives a x10 speedup because
             it is faster to sample iid rv.'''
-        v_mean = self.propdown(h)
-        return (np.random.uniform(size=v_mean.shape) < v_mean).astype(float)
+        label_prob, v_mean = self.propdown(h)
+        labels = np.zeros((len(h),self.n_labels), dtype=float)
+        for i in range(len(h)):
+            labels[i,:] = np.random.multinomial(1, label_prob[i,:])
+        return np.concatenate((
+                    labels,
+                    np.random.uniform(size=v_mean.shape) < v_mean)
+                ,axis=1)
 
 
 
@@ -211,55 +223,6 @@ class RBM(object):
         for i in range(len(test_set)):
             count += (np.argmax(test_set[i,:self.n_labels]) == self.predict_one(test_set[i,:]))
         return float(count)/len(test_set)
-#==============================================================================
-# 
-#     def update(self, batch, persistent=False, lr=0.1, k=1):
-#         """This functions implements one step of CD-k or PCD-k
-# 
-#         :param lr: learning rate used to train the RBM
-# 
-#         :param persistent: False for CD, true for PCD.
-# 
-#         :param k: number of Gibbs steps to do in CD-k/PCD-k
-# 
-#         """
-#         if persistent:
-#             if self.persistent == None:
-#                 self.persistent = np.copy(batch)
-#                 
-#         if self.persistent is None:
-#             batch_k = np.copy(batch)
-#         else:
-#             batch_k = np.copy(self.persistent)
-#         
-#                 
-#         for i in range(len(batch)):
-#             v0 = batch[i,:]
-#             # decide how to initialize persistent chain:
-#             # for CD, we use the sample
-#             # for PCD, we initialize from the old state of the chain
-# #==============================================================================
-# #             if self.persistent is None:
-# #                 vk = v0
-# #             else:
-# #                 vk = self.persistent[i,:]
-# #==============================================================================
-#                 
-#                 
-#             # Gibbs sampling
-#             for j in range(k):
-#                 batch_k[i,:] = self.gibbs_vhv(np.copy(batch_k[i,:]))
-#             vk = batch_k[i,:].astype(float)
-#     
-#             # determine gradients on RBM parameters
-#             phv0 = sigmoid(np.dot(v0, self.W) + self.hbias) 
-#             phvk = sigmoid(np.dot(vk, self.W) + self.hbias) 
-#             self.W += lr*(np.outer(v0, phv0) - np.outer(vk, phvk))
-#             self.vbias += lr*(v0 - vk)
-#             self.hbias += lr*(phv0 - phvk)
-#            if persistent:
-#                self.persistent[i,:] = vk
-#==============================================================================
 
 
     def update(self, batch, persistent=False, lr=0.1, k=1):
@@ -281,7 +244,7 @@ class RBM(object):
         if self.persistent is None:
             batch_k = batch.astype(float) # astype produces a deep copy.
         else:
-            batch_k = persistent # shallow copy.
+            batch_k = self.persistent # shallow copy.
         
         # Draw dropout.
         dropout = np.random.binomial(size=(self.batch_size, self.n_hidden), n=1, p=(1-self.dropout_rate))        

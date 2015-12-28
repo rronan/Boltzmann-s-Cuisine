@@ -87,7 +87,7 @@ for epoch in xrange(training_epochs):
     # go through the training set
     mean_cost = []
     for batch_index in xrange(n_train_batches):
-        rbm.update(np_train_set[batch_index*batch_size:(batch_index+1)*batch_size,:], persistent=False, k=10)
+        rbm.update(np_train_set[batch_index*batch_size:(batch_index+1)*batch_size,:], persistent=True, k=10)
         if np.sum(np.isnan(rbm.W)) > 0:
             print "stop"
     print ('Epoch took %f minutes' % ((timeit.default_timer()-epoch_time) / 60.))
