@@ -145,7 +145,8 @@ def extract_feats(ingredients, uniques):
     feats_whole = np.zeros((len(ingredients), len(uniques)), dtype=bool)
     for i in range(len(ingredients)):
         for j in ingredients[i]:
-            feats_whole[i, uniques.index(j)] = True
+            if j in uniques:
+                feats_whole[i, uniques.index(j)] = True
             
     new_uniques = []
     for m in uniques:
@@ -156,7 +157,8 @@ def extract_feats(ingredients, uniques):
     for i in range(len(ingredients)):
         for j in ingredients[i]:
             for k in j.split():
-                feats_each[i, new_uniques.index(k)] = True
+                if k in new_uniques:
+                    feats_each[i, new_uniques.index(k)] = True
             
     return np.hstack((feats_whole, feats_each)).astype(bool)
     
@@ -201,15 +203,17 @@ if __name__ == '__main__':
     test_ingredients = remove_units(test_ingredients)
     test_ingredients = stem_words(test_ingredients)
     
-    # encode   
+    # encode
     print("Encoding...\n")  
     le = LabelEncoder()
     targets = le.fit_transform(train_cuisines)
     classes, targets = k_to_one_hot(targets)
     
     # extract features
+    # We are only interested in features from which we can train, that is those
+    # of the training set.
     print("Feature extraction...\n") 
-    uniques = list(set([item for sublist in train_ingredients + test_ingredients for item in sublist]))
+    uniques = list(set([item for sublist in train_ingredients for item in sublist]))
     train_feats = extract_feats(train_ingredients, uniques)
     test_feats = extract_feats(test_ingredients, uniques)
     
