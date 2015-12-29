@@ -114,7 +114,7 @@ class RBM(object):
         self.hbias = rbm_object.hbias
         self.vbias = rbm_object.vbias
         
-
+    # TODO: Use logaddexp (and maybe log1p) for numerical stability.
     def propup(self, v, r):
         '''This function propagates the visible units activation upwards to
         the hidden units
