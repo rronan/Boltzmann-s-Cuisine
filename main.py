@@ -8,7 +8,7 @@ Created on Wed Dec 02 16:03:09 2015
 import timeit
 
 import numpy as np
-
+import sys 
 from RBM import RBM
 
 import random
@@ -22,6 +22,7 @@ batch_size=20
 n_chains=20
 output_folder='rbm_plots'
 n_hidden=200
+dropout_rate=0.5
 k=5
 do_report = True
 
@@ -34,6 +35,7 @@ if do_report:
               "n_chains":n_chains,
               "output_folder":'rbm_plots',
               "n_hidden":n_hidden,
+              "dropout_rate":dropout_rate,
               "k":k,
               "costs":np.zeros(training_epochs),
               "accuracy":np.zeros(training_epochs),
@@ -70,6 +72,7 @@ rng = np.random.RandomState(123)
 rbm = RBM(n_visible=n_visible,
           n_labels=n_labels,
           n_hidden=n_hidden, 
+          dropout_rate=dropout_rate,
           batch_size=batch_size,
           np_rng=rng)
           
@@ -78,38 +81,30 @@ rbm = RBM(n_visible=n_visible,
 #==============================================================================
 
 
-plotting_time = 0.
 start_time = timeit.default_timer()
 
-## go through training epochs
 for epoch in xrange(training_epochs):
     epoch_time = timeit.default_timer()
-    # go through the training set
     mean_cost = []
     for batch_index in xrange(n_train_batches):
-        rbm.update(np_train_set[batch_index*batch_size:(batch_index+1)*batch_size,:], persistent=True, k=10)
-        if np.sum(np.isnan(rbm.W)) > 0:
-            print "stop"
-    print ('Epoch took %f minutes' % ((timeit.default_timer()-epoch_time) / 60.))
-    #print 'Training epoch %d, cost is ' % epoch, np.mean(mean_cost)
+        rbm.update(np_train_set[batch_index*batch_size:(batch_index+1)*batch_size,:], persistent=True, k=k)
+        sys.stdout.write("\rEpoch advancement: %d%%" % (100*float(batch_index)/n_train_batches))
+        sys.stdout.flush()
+    sys.stdout.write("\rEvaluating accuracy...")
+    sys.stdout.flush()
     acc = rbm.cv_accuracy(np_test_set)
-    print 'Training epoch', epoch, 'accuracy is', acc
+    sys.stdout.write('\rEpoch %i took %f minutes, accuracy is %f.\n' % (epoch, ((timeit.default_timer()-epoch_time) / 60.), acc))
     if do_report:
         report["costs"][epoch] = np.mean(mean_cost)
         report["accuracy"][epoch] = acc
         
- 
 end_time = timeit.default_timer()
-
 pretraining_time = (end_time - start_time)
-
 print ('Training took %f minutes' % (pretraining_time / 60.))
 
 #%%============================================================================
 # Classifying with the RBM
 #==============================================================================
-
-
 
 if do_report:
     np.save('report', report)
