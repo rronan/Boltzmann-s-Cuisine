@@ -259,7 +259,7 @@ class RBM(object):
         :param k: number of Gibbs steps to do in CD-k/PCD-k
 
         """
-        if persistent and self.persistent == None:
+        if persistent and self.persistent is None:
             self.persistent = batch.astype(float) # astype produces a deep copy.
                 
         # decide how to initialize persistent chain:
