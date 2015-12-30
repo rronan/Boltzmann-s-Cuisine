@@ -17,13 +17,13 @@ np.random.seed(seed=0)
  
  
 learning_rate=0.01
-training_epochs=10
+training_epochs=50
 batch_size=20
 n_chains=20
 output_folder='rbm_plots'
 n_hidden=200
 dropout_rate=0.5
-k=5
+k=20
 do_report = True
 
 # Create a report to be saved at the end of execution (when running on the 
@@ -82,7 +82,7 @@ rbm = RBM(n_visible=n_visible,
 
 
 start_time = timeit.default_timer()
-
+accuracies = []
 for epoch in xrange(training_epochs):
     epoch_time = timeit.default_timer()
     mean_cost = []
@@ -90,10 +90,14 @@ for epoch in xrange(training_epochs):
         rbm.update(np_train_set[batch_index*batch_size:(batch_index+1)*batch_size,:], persistent=True, k=k)
         sys.stdout.write("\rEpoch advancement: %d%%" % (100*float(batch_index)/n_train_batches))
         sys.stdout.flush()
+    rbm.update(np_train_set[(batch_index+1)*batch_size:,:], persistent=True, k=k)
     sys.stdout.write("\rEvaluating accuracy...")
     sys.stdout.flush()
+    cv_time = timeit.default_timer()
     acc = rbm.cv_accuracy(np_test_set)
-    sys.stdout.write('\rEpoch %i took %f minutes, accuracy is %f.\n' % (epoch, ((timeit.default_timer()-epoch_time) / 60.), acc))
+    accuracies.append(acc)
+    sys.stdout.write('\rEpoch %i took %f minutes, accuracy (computed in %f minutes) is %f.\n'
+        % (epoch, ((cv_time-epoch_time) / 60.), ((timeit.default_timer()-cv_time) / 60.), acc))
     if do_report:
         report["costs"][epoch] = np.mean(mean_cost)
         report["accuracy"][epoch] = acc

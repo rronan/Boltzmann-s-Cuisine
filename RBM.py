@@ -215,14 +215,38 @@ class RBM(object):
         
     def predict_one(self, v):
         prediction_base = np.concatenate((np.eye(self.n_labels, dtype=float), np.tile(v[self.n_labels:].astype(float),(self.n_labels,1))), axis=1)
-        p = np.prod(1 + np.exp(self.hbias + np.dot(prediction_base,self.W)), axis=1) * np.exp(self.vbias[:self.n_labels])
-        return np.argmax(p)
+        logp = np.sum(np.logaddexp(0, self.hbias + np.dot(prediction_base,self.W)), axis=1) + (self.vbias[:self.n_labels])
+        #p = np.prod(1 + np.exp(self.hbias + np.dot(prediction_base,self.W)), axis=1) * np.exp(self.vbias[:self.n_labels])
+        return np.argmax(logp)
+        
+#==============================================================================
+#     def predict_block(self, test_batch):
+#         possible_labels = np.repeat(np.eye(self.n_labels, dtype=bool), len(test_batch[:,self.n_labels:]), axis=0)
+#         possible_labels.shape = (self.n_labels,  len(test_batch[:,self.n_labels:]), self.n_labels)
+#         tiled_test_set = np.tile(test_batch[:,self.n_labels:],(1,self.n_labels,1))
+#         tiled_test_set.shape = (self.n_labels,  len(test_batch[:,self.n_labels:]), len(test_batch[:,self.n_labels:][0]))
+#         prediction_base = np.concatenate((possible_labels, tiled_test_set), axis=2).astype(bool)
+#         logp =  np.sum(np.logaddexp(0, self.hbias + np.dot(prediction_base,self.W)), axis=2) + self.vbias[:self.n_labels,np.newaxis]
+#         return np.argmax(logp, axis=0)
+#==============================================================================
         
     def cv_accuracy(self, test_set):
         count = 0
         for i in range(len(test_set)):
             count += (np.argmax(test_set[i,:self.n_labels]) == self.predict_one(test_set[i,:]))
         return float(count)/len(test_set)
+        
+#==============================================================================
+#     def cv_block_accuracy(self, test_set):
+#         count = 0
+#         batch_size = 2
+#         for batch_index in xrange(len(test_set)/batch_size):
+#             pred = self.predict_block(test_set[batch_index*batch_size:(batch_index+1)*batch_size,:])
+#             count += np.sum(np.argmax(test_set[batch_index*batch_size:(batch_index+1)*batch_size,:self.n_labels], axis=1) == pred)
+#         pred = self.predict_block(test_set[(batch_index+1)*batch_size:,:])
+#         count += np.sum(np.argmax(test_set[(batch_index+1)*batch_size:,:self.n_labels], axis=1) == pred)
+#         return float(count)/len(test_set)
+#==============================================================================
 
 
     def update(self, batch, persistent=False, lr=0.1, k=1):
@@ -244,10 +268,10 @@ class RBM(object):
         if self.persistent is None:
             batch_k = batch.astype(float) # astype produces a deep copy.
         else:
-            batch_k = self.persistent # shallow copy.
+            batch_k = self.persistent[:len(batch),:] # shallow copy.
         
         # Draw dropout.
-        dropout = np.random.binomial(size=(self.batch_size, self.n_hidden), n=1, p=(1-self.dropout_rate))        
+        dropout = np.random.binomial(size=(len(batch), self.n_hidden), n=1, p=(1-self.dropout_rate))        
         
         # Gibbs sampling
         for j in range(k):
@@ -256,11 +280,11 @@ class RBM(object):
         # determine gradients on RBM parameters
         h_mean_0 = self.propup(batch, dropout)
         h_mean_k = self.propup(batch_k, dropout)
-        self.W += lr*(np.dot(batch.T, h_mean_0) - np.dot(batch_k.T, h_mean_k))/self.batch_size
+        self.W += lr*(np.dot(batch.T, h_mean_0) - np.dot(batch_k.T, h_mean_k))/len(batch)
         self.vbias += lr*(np.mean(batch, axis=0) - np.mean(batch_k, axis=0))
         self.hbias += lr*(np.mean(h_mean_0, axis=0) - np.mean(h_mean_k, axis=0))
         if persistent:
-            self.persistent = batch_k # shallow copy.
+            self.persistent[:len(batch),:] = batch_k # shallow copy.
 
 
 
