@@ -13,19 +13,20 @@ from RBM import RBM
 
 from sklearn.grid_search import ParameterGrid
 
-data_name='train_data_reduced.npy'
+#data_name='train_data_reduced.npy'
+data_name='train_data.npy'
 report_name='report'
 scoring='accuracy'
 do_report = True
 
 # number of epochs allowed without increasing of accuracy
-increasing_constraint = 20
+increasing_constraint = 10
 
 params = {'learning_rate':[0.05, 0.01],
-          'training_epochs':[300],
+          'training_epochs':[150],
           'batch_size':[20],
           'n_chains':[20],
-          'n_hidden':[200, 400, 1000],
+          'n_hidden':[200, 1000],
           'dropout_rate':[0.5],
           'k':[5]}
 

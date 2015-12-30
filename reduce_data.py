@@ -5,12 +5,7 @@ Created on Sun Dec 27 11:03:21 2015
 @author: navrug
 """
 
-
 import numpy as np
-
-
-
-
 
 data = np.load('train_data.npy')
 
