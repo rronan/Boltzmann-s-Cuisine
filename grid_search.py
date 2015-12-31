@@ -22,13 +22,13 @@ do_report = True
 # number of epochs allowed without increasing of accuracy
 increasing_constraint = 10
 
-params = {'learning_rate':[0.05, 0.01],
+params = {'learning_rate':[0.01],
           'training_epochs':[150],
           'batch_size':[20],
           'n_chains':[20],
-          'n_hidden':[200, 1000],
+          'n_hidden':[20000],
           'dropout_rate':[0.5],
-          'k':[5]}
+          'k':[20]}
 
 param_grid = list(ParameterGrid(params))
 
