@@ -74,10 +74,9 @@ for i, current_params in enumerate(param_grid):
     train_idx = permutation[test_n:]
     np_train_set = data[train_idx,:]
     del data
-    
+        
     # compute number of minibatches for training, validation and testing
-    batches = [np_train_set[i:i + batch_size,:] \
-        for i in range(0, np_train_set.shape[0], batch_size)]
+    n_train_batches = len(np_train_set) / batch_size
 
     rng = np.random.RandomState(123)   
     # construct the RBM class
@@ -103,10 +102,9 @@ for i, current_params in enumerate(param_grid):
     for epoch in xrange(training_epochs):
         epoch_time = timeit.default_timer()
         mean_cost = []
-        for batch_index, batch in enumerate(batches):
-            rbm.update(batch, persistent=True, k=k)
-            sys.stdout.write("\rEpoch advancement: %d%%" 
-                % (100*float(batch_index)/len(batches)))
+        for batch_index in xrange(n_train_batches):
+            rbm.update(np_train_set[batch_index*batch_size:(batch_index+1)*batch_size,:], persistent=True, k=k)
+            sys.stdout.write("\rEpoch advancement: %d%%" % (100*float(batch_index)/n_train_batches))
             sys.stdout.flush()
         sys.stdout.write("\rEvaluating accuracy...")
         sys.stdout.flush()
