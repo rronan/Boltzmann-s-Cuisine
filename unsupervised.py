@@ -1,15 +1,16 @@
 # -*- coding: utf-8 -*-
 """
-Created on Wed Dec 02 16:03:09 2015
+Created on Sun Jan  3 17:25:34 2016
 
-@author: Gurvan
+@author: navrug
 """
 
 import timeit
 
 import numpy as np
 import sys 
-from RBM import SupervisedRBM
+from RBM import RBM
+from sklearn.linear_model import LogisticRegression
 
 import random
 
@@ -65,14 +66,16 @@ train_idx = permutation[test_n:]
 train_set = data[train_idx,:]
 del data
 
+test_labels = np.argmax(test_set[:,:n_labels], axis=1)
+train_labels = np.argmax(train_set[:,:n_labels], axis=1)
+
 # compute number of minibatches for training, validation and testing
 batches = [train_set[i:i + batch_size,:] \
     for i in range(0, train_set.shape[0], batch_size)]
 
 rng = np.random.RandomState(123)
-
 # construct the RBM class
-rbm = SupervisedRBM(n_visible=n_visible,
+rbm = RBM(n_visible=n_visible,
           n_labels=n_labels,
           n_hidden=n_hidden, 
           dropout_rate=dropout_rate,
@@ -104,9 +107,15 @@ for epoch in xrange(training_epochs):
         report["hbias"] = rbm.hbias
         report["vbias"] = rbm.vbias
         np.save('report', report)
-    sys.stdout.write("\rEvaluating accuracy...")
+    # Training Logistic regression
+    sys.stdout.write("\rTraining softmax...")
+    sm_time = timeit.default_timer()
+    softmax_classifier = LogisticRegression(penalty='l1', C=1.0)
+    softmax_classifier.fit(rbm.propup(train_set[:,n_labels:]), train_labels)
+    sys.stdout.write('\rSoftmax trained in %f minutes.\n' % ((timeit.default_timer()-sm_time) / 60.))
+    sys.stdout.write("Evaluating accuracy...")
     cv_time = timeit.default_timer()
-    acc = rbm.cv_accuracy(test_set)
+    acc = softmax_classifier.score(rbm.propup(test_set[:,n_labels:]), test_labels)
     accuracies.append(acc)
     sys.stdout.write('\rEpoch %i took %f minutes, accuracy (computed in %f minutes) is %f.\n'
         % (epoch, ((cv_time-epoch_time) / 60.), ((timeit.default_timer()-cv_time) / 60.), acc))

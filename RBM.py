@@ -139,20 +139,12 @@ class RBM(object):
         return softmax(pre_activation[:,:self.n_labels]), sigmoid(pre_activation[:,self.n_labels:])
         
 
-    # TODO: Use softmax for generating the label
     def sample_v_given_h(self, h):
         ''' This function infers state of visible units given hidden units.
             Using rand() instead of binomial() gives a x10 speedup because
             it is faster to sample iid rv.'''
-        label_prob, v_mean = self.propdown(h)
-        labels = np.zeros((len(h),self.n_labels), dtype=float)
-        for i in range(len(h)):
-            labels[i,:] = np.random.multinomial(1, label_prob[i,:])
-        return np.concatenate((
-                    labels,
-                    np.random.uniform(size=v_mean.shape) < v_mean)
-                ,axis=1)
-
+        v_mean = self.propdown(h)
+        return (np.random.uniform(size=v_mean.shape) < v_mean).astype(float)
 
 
     def gibbs_hvh(self, h):
@@ -170,84 +162,8 @@ class RBM(object):
         h = self.sample_h_given_v(v, r)
         return self.sample_v_given_h(h)
 
-    
-    def build_prediction_base(self, test_set):
-        ''' DEPRECATED: The data we use is too big to allow building this in
-            memory. Use cv_accuracy instead.
-            This function builds the matrix that is used for efficient
-            predicitons. Must be fed with a boolean test set.'''
-        self.test_labels = np.argmax(test_set[:, :self.n_labels], axis=1)
-        possible_labels = np.repeat(np.eye(self.n_labels, dtype=bool), len(test_set[:,self.n_labels:]), axis=0)
-        possible_labels.shape = (self.n_labels,  len(test_set[:,self.n_labels:]), self.n_labels)
-        tiled_test_set = np.tile(test_set[:,self.n_labels:],(1,self.n_labels,1))
-        tiled_test_set.shape = (self.n_labels,  len(test_set[:,self.n_labels:]), len(test_set[:,self.n_labels:][0]))
-        self.prediction_base = np.concatenate((possible_labels, tiled_test_set), axis=2)
         
         
-                
-    def predict(self):
-        ''' DEPRECATED: The data we use is too big to allow building this in
-            memory. Use cv_accuracy instead.
-        This function makes a prediction for an unlabelled sample,
-        this is done by computing Z.P(v_unlablled,label) which is proportional
-        to P(label|v_unlabelled).'''
-        '''
-        P(vlabel|vdata) = P(vlabel, vdata) / P(vdata)
-                          = P(vlabel, vdata) / Sum_{vlabel'} P(vlabel', vdata)
-                          = Prod_j exp(vbias_j*v_j) * Prod(1+exp(c_i + (Wv)_i))
-                            / Sum_{vlabel'} Prod_j exp(vbias_j*v'_j) * Prod(1+exp(c_i + (Wv')_i))
-                          = exp(hbias_label) * Prod(1+exp(c_i + (Wv)_i))
-                            / Sum_{vlabel'} exp(hbias_label') * Prod(1+exp(c_i + (Wv')_i))
-                   prop. to exp(hbias_label) * Prod(1+exp(c_i + (Wv)_i))
-        '''
-        
-        # It may be needed use log of probabilities.
-        p =  np.einsum('ij,i->ij',np.prod(1 + np.exp(self.hbias + np.dot(self.prediction_base,self.W)), axis=2),np.exp(self.vbias[:self.n_labels])) 
-        labels = np.argmax(p, axis=0)   
-        # TODO: find a way to do it like confidence = p[labels]
-        # p = p / np.sum(p)
-        # confidence = np.max(p, axis=0)
-        return labels
-
-
-    def block_cv_accuracy(self):
-        return float(np.sum(self.predict() == self.test_labels))/len(self.test_labels)
-        
-    def predict_one(self, v):
-        prediction_base = np.concatenate((np.eye(self.n_labels, dtype=float), np.tile(v[self.n_labels:].astype(float),(self.n_labels,1))), axis=1)
-        logp = np.sum(np.logaddexp(0, self.hbias + np.dot(prediction_base,self.W)), axis=1) + (self.vbias[:self.n_labels])
-        #p = np.prod(1 + np.exp(self.hbias + np.dot(prediction_base,self.W)), axis=1) * np.exp(self.vbias[:self.n_labels])
-        return np.argmax(logp)
-        
-#==============================================================================
-#     def predict_block(self, test_batch):
-#         possible_labels = np.repeat(np.eye(self.n_labels, dtype=bool), len(test_batch[:,self.n_labels:]), axis=0)
-#         possible_labels.shape = (self.n_labels,  len(test_batch[:,self.n_labels:]), self.n_labels)
-#         tiled_test_set = np.tile(test_batch[:,self.n_labels:],(1,self.n_labels,1))
-#         tiled_test_set.shape = (self.n_labels,  len(test_batch[:,self.n_labels:]), len(test_batch[:,self.n_labels:][0]))
-#         prediction_base = np.concatenate((possible_labels, tiled_test_set), axis=2).astype(bool)
-#         logp =  np.sum(np.logaddexp(0, self.hbias + np.dot(prediction_base,self.W)), axis=2) + self.vbias[:self.n_labels,np.newaxis]
-#         return np.argmax(logp, axis=0)
-#==============================================================================
-        
-    def cv_accuracy(self, test_set):
-        count = 0
-        for i in range(len(test_set)):
-            count += (np.argmax(test_set[i,:self.n_labels]) == self.predict_one(test_set[i,:]))
-        return float(count)/len(test_set)
-        
-#==============================================================================
-#     def cv_block_accuracy(self, test_set):
-#         count = 0
-#         batch_size = 2
-#         for batch_index in xrange(len(test_set)/batch_size):
-#             pred = self.predict_block(test_set[batch_index*batch_size:(batch_index+1)*batch_size,:])
-#             count += np.sum(np.argmax(test_set[batch_index*batch_size:(batch_index+1)*batch_size,:self.n_labels], axis=1) == pred)
-#         pred = self.predict_block(test_set[(batch_index+1)*batch_size:,:])
-#         count += np.sum(np.argmax(test_set[(batch_index+1)*batch_size:,:self.n_labels], axis=1) == pred)
-#         return float(count)/len(test_set)
-#==============================================================================
-
 
     def update(self, batch, persistent=False, lr=0.1, k=1):
         """This functions implements one step of CD-k or PCD-k
@@ -288,3 +204,32 @@ class RBM(object):
 
 
 
+class SupervisedRBM(RBM):
+    
+    def sample_v_given_h(self, h):
+        ''' This function infers state of visible units given hidden units.
+            Using rand() instead of binomial() gives a x10 speedup because
+            it is faster to sample iid rv.'''
+        label_prob, v_mean = self.propdown(h)
+        labels = np.zeros((len(h),self.n_labels), dtype=float)
+        for i in range(len(h)):
+            labels[i,:] = np.random.multinomial(1, label_prob[i,:])
+        return np.concatenate((
+                    labels,
+                    np.random.uniform(size=v_mean.shape) < v_mean)
+                ,axis=1)
+                
+                
+    def predict_one(self, v):
+        prediction_base = np.concatenate((np.eye(self.n_labels, dtype=float), np.tile(v[self.n_labels:].astype(float),(self.n_labels,1))), axis=1)
+        logp = np.sum(np.logaddexp(0, self.hbias + np.dot(prediction_base,self.W)), axis=1) + (self.vbias[:self.n_labels])
+        #p = np.prod(1 + np.exp(self.hbias + np.dot(prediction_base,self.W)), axis=1) * np.exp(self.vbias[:self.n_labels])
+        return np.argmax(logp)
+        
+       
+    def cv_accuracy(self, test_set):
+        count = 0
+        for i in range(len(test_set)):
+            count += (np.argmax(test_set[i,:self.n_labels]) == self.predict_one(test_set[i,:]))
+        return float(count)/len(test_set)
+        
