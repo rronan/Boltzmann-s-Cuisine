@@ -22,9 +22,9 @@ training_epochs=50
 batch_size=20
 n_chains=20
 output_folder='rbm_plots'
-n_hidden=2000
+n_hidden=200
 dropout_rate=0.5
-k=20
+k=1
 do_report = True
 load_saved = False
 
@@ -46,11 +46,11 @@ elif do_report:
               "accuracy":np.zeros(training_epochs),
               "pretraining_time":0}
 
-data = np.load('train_data.npy')
+data = np.load('train_data_reduced.npy')
 
 n_labels = 20
 
-n_visible = data.shape[1]
+n_visible = data.shape[1]-n_labels
 
 # Split of train_data for cross-validation
 n_fold = 3
@@ -70,13 +70,12 @@ test_labels = np.argmax(test_set[:,:n_labels], axis=1)
 train_labels = np.argmax(train_set[:,:n_labels], axis=1)
 
 # compute number of minibatches for training, validation and testing
-batches = [train_set[i:i + batch_size,:] \
+batches = [train_set[i:i + batch_size,n_labels:] \
     for i in range(0, train_set.shape[0], batch_size)]
 
 rng = np.random.RandomState(123)
 # construct the RBM class
 rbm = RBM(n_visible=n_visible,
-          n_labels=n_labels,
           n_hidden=n_hidden, 
           dropout_rate=dropout_rate,
           batch_size=batch_size,
@@ -110,12 +109,12 @@ for epoch in xrange(training_epochs):
     # Training Logistic regression
     sys.stdout.write("\rTraining softmax...")
     sm_time = timeit.default_timer()
-    softmax_classifier = LogisticRegression(penalty='l1', C=1.0)
-    softmax_classifier.fit(rbm.propup(train_set[:,n_labels:]), train_labels)
+    softmax_classifier = LogisticRegression(penalty='l1', C=1.0, solver='lbfgs', multi_class='multinomial')
+    softmax_classifier.fit(rbm.propup(train_set[:,n_labels:], np.ones((len(train_set),n_hidden))), train_labels)
     sys.stdout.write('\rSoftmax trained in %f minutes.\n' % ((timeit.default_timer()-sm_time) / 60.))
     sys.stdout.write("Evaluating accuracy...")
     cv_time = timeit.default_timer()
-    acc = softmax_classifier.score(rbm.propup(test_set[:,n_labels:]), test_labels)
+    acc = softmax_classifier.score(rbm.propup(test_set[:,n_labels:], np.ones((len(test_set),n_hidden))), test_labels)
     accuracies.append(acc)
     sys.stdout.write('\rEpoch %i took %f minutes, accuracy (computed in %f minutes) is %f.\n'
         % (epoch, ((cv_time-epoch_time) / 60.), ((timeit.default_timer()-cv_time) / 60.), acc))

@@ -25,7 +25,6 @@ class RBM(object):
     def __init__(
         self,
         n_visible,
-        n_labels,
         n_hidden,
         batch_size,
         dropout_rate=0.0,
@@ -61,7 +60,6 @@ class RBM(object):
         """
 
         self.n_visible = n_visible
-        self.n_labels = n_labels
         self.n_hidden = n_hidden
         self.batch_size = batch_size
         self.dropout_rate = dropout_rate
@@ -135,8 +133,7 @@ class RBM(object):
         '''This function propagates the hidden units activation downwards to
         the visible units
         '''
-        pre_activation = np.dot(h, self.W.T) + self.vbias
-        return softmax(pre_activation[:,:self.n_labels]), sigmoid(pre_activation[:,self.n_labels:])
+        return sigmoid(np.dot(h, self.W.T) + self.vbias)
         
 
     def sample_v_given_h(self, h):
@@ -205,7 +202,15 @@ class RBM(object):
 
 
 class SupervisedRBM(RBM):
-    
+
+    def propdown(self, h):
+        '''This function propagates the hidden units activation downwards to
+        the visible units
+        '''
+        pre_activation = np.dot(h, self.W.T) + self.vbias
+        return softmax(pre_activation[:,:self.n_labels]), sigmoid(pre_activation[:,self.n_labels:])
+        
+        
     def sample_v_given_h(self, h):
         ''' This function infers state of visible units given hidden units.
             Using rand() instead of binomial() gives a x10 speedup because
