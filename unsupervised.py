@@ -22,18 +22,15 @@ training_epochs=50
 batch_size=20
 n_chains=20
 output_folder='rbm_plots'
-n_hidden=200
+n_hidden=100
 dropout_rate=0.5
 k=1
 do_report = True
-load_saved = False
 
 # Create a report to be saved at the end of execution (when running on the 
 # remote server)
 
-if load_saved:
-    report = np.load("report.npy").item()
-elif do_report:
+if do_report:
     report = {"learning_rate":learning_rate,
               "training_epochs":training_epochs,
               "batch_size":batch_size,
@@ -81,11 +78,6 @@ rbm = RBM(n_visible=n_visible,
           batch_size=batch_size,
           np_rng=rng)
           
-if load_saved:
-    rbm.W = report["W"]
-    rbm.hbias = report["hbias"]
-    rbm.vbias = report["vbias"]
-
           
 #%%============================================================================
 # Training the RBM
@@ -94,6 +86,7 @@ if load_saved:
 
 start_time = timeit.default_timer()
 accuracies = []
+argmax_acc = 0
 for epoch in xrange(training_epochs):
     epoch_time = timeit.default_timer()
     mean_cost = []
@@ -101,39 +94,48 @@ for epoch in xrange(training_epochs):
         rbm.update(batch, persistent=True, k=k)
         sys.stdout.write("\rEpoch advancement: %d%%" % (100*float(batch_index)/len(batches)))
         sys.stdout.flush() 
-    if do_report:
-        report["W"] = rbm.W
-        report["hbias"] = rbm.hbias
-        report["vbias"] = rbm.vbias
-        np.save('report', report)
     # Training Logistic regression
     sys.stdout.write("\rTraining softmax...")
     sm_time = timeit.default_timer()
-    softmax_classifier = LogisticRegression(penalty='l1', C=1.0, solver='lbfgs', multi_class='multinomial')
-    softmax_classifier.fit(rbm.propup(train_set[:,n_labels:], np.ones((len(train_set),n_hidden))), train_labels)
+    softmax_classifier = LogisticRegression(penalty='l1', 
+                                            C=1.0, 
+                                            solver='lbfgs', 
+                                            multi_class='multinomial')
+    softmax_classifier.fit(rbm.propup(train_set[:,n_labels:], np.ones((len(train_set),n_hidden))),
+                           train_labels)
     sys.stdout.write('\rSoftmax trained in %f minutes.\n' % ((timeit.default_timer()-sm_time) / 60.))
     sys.stdout.write("Evaluating accuracy...")
     cv_time = timeit.default_timer()
-    acc = softmax_classifier.score(rbm.propup(test_set[:,n_labels:], np.ones((len(test_set),n_hidden))), test_labels)
+    acc = softmax_classifier.score(rbm.propup(test_set[:,n_labels:], np.ones((len(test_set),n_hidden))), 
+                                   test_labels)
     accuracies.append(acc)
-    sys.stdout.write('\rEpoch %i took %f minutes, accuracy (computed in %f minutes) is %f.\n'
-        % (epoch, ((cv_time-epoch_time) / 60.), ((timeit.default_timer()-cv_time) / 60.), acc))
+    sys.stdout.write('''\rEpoch %i took %f minutes, 
+                     accuracy (computed in %f minutes) is %f.\n'''
+        % (epoch, ((cv_time-epoch_time) / 60.), 
+           ((timeit.default_timer()-cv_time) / 60.), acc))
     if do_report:
         report["costs"][epoch] = np.mean(mean_cost)
         report["accuracy"][epoch] = acc
+        if (acc>argmax_acc):
+            report["W"] = rbm.W
+            report["hbias"] = rbm.hbias
+            report["vbias"] = rbm.vbias
+            np.save('report', report)
+            sys.stdout.write("Model saved \n")
         
 end_time = timeit.default_timer()
 pretraining_time = (end_time - start_time)
+report["pretraining_time"] = pretraining_time
 print ('Training took %f minutes' % (pretraining_time / 60.))
 
-#170 min/epoch, 0.48, 0.54, 0.65, 0.69, 0.69, 0.67, 0.74
+if do_report:
+    np.save('report', report)
 
 #%%============================================================================
 # Classifying with the RBM
 #==============================================================================
 
-if do_report:
-    np.save('report', report)
+
     
 #%%============================================================================
 # Sampling from the RBM
