@@ -25,7 +25,7 @@ n_hidden=2000
 dropout_rate=0.5
 k=20
 do_report = True
-load_saved = False
+load_saved = True
 
 # Create a report to be saved at the end of execution (when running on the 
 # remote server)
@@ -73,7 +73,7 @@ rng = np.random.RandomState(123)
 
 # construct the RBM class
 rbm = SupervisedRBM(n_visible=n_visible,
-          n_labels=n_labels,
+#          n_labels=n_labels,
           n_hidden=n_hidden, 
           dropout_rate=dropout_rate,
           batch_size=batch_size,
