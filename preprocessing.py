@@ -69,7 +69,7 @@ def create_submission(test_ids, guess):
     sub_file_name = sub_file_name.replace(':', '-')
     np.savetxt(sub_file_name, sub, delimiter=",", fmt="%s")
     
-    return None  
+    return None
     
 
 def remove_numbers(ing):
@@ -214,12 +214,12 @@ if __name__ == '__main__':
     # of the training set.
     print("Feature extraction...\n") 
     uniques = list(set([item for sublist in train_ingredients for item in sublist]))
-    train_feats = extract_feats(train_ingredients, uniques)
+    #train_feats = extract_feats(train_ingredients, uniques)
     test_feats = extract_feats(test_ingredients, uniques)
     
-    np.save('train_data',np.hstack((targets.astype(bool), train_feats)).astype(bool))
+    #np.save('train_data',np.hstack((targets.astype(bool), train_feats)).astype(bool))
     np.save('test_id', test_ids)
-    np.save('test_data', np.hstack((np.zeros((len(train_feats), len(classes)), dtype=bool), train_feats)).astype(bool))
+    np.save('test_data', test_feats.astype(bool))
     
   
 #==============================================================================
