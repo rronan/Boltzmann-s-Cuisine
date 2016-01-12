@@ -16,11 +16,14 @@ for j in range(len(data[0])):
     if np.sum(data[:,j]) < th:
         small[np.sum(data[:,j])] += 1
     else:
+#        to_keep.append(j-20)
         to_keep.append(j)
         
 print "small", small
 print "sum", sum(small)
         
-reduced = data[:,to_keep]
+test = np.load('test_data.npy')
 
-np.save("train_data_reduced", reduced)
+reduced = test[:,to_keep[20:]]
+
+np.save("test_data_reduced", reduced)

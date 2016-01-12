@@ -22,9 +22,9 @@ training_epochs=50
 batch_size=20
 n_chains=20
 output_folder='rbm_plots'
-n_hidden=100
+n_hidden=2000
 dropout_rate=0.5
-k=1
+k=20
 do_report = True
 
 # Create a report to be saved at the end of execution (when running on the 
@@ -43,7 +43,7 @@ if do_report:
               "accuracy":np.zeros(training_epochs),
               "pretraining_time":0}
 
-data = np.load('train_data_reduced.npy')
+data = np.load('train_data.npy')
 
 n_labels = 20
 

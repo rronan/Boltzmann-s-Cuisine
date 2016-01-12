@@ -72,7 +72,7 @@ batches = [np_train_set[i:i + batch_size,:] \
 rng = np.random.RandomState(123)
 # construct the RBM class
 rbm = SupervisedRBM(n_visible=n_visible,
-          n_labels=n_labels,
+#          n_labels=n_labels,
           n_hidden=n_hidden, 
           dropout_rate=dropout_rate,
           batch_size=batch_size,
