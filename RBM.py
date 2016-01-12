@@ -45,7 +45,7 @@ class RBM(object):
         
         :param n_visible: number of visible units that are labels
 
-        :param n_hidden: number of hidden units
+        :param n_hidden: number of hidden units"
 
         :param W: None for standalone RBMs or symbolic variable pointing to a
         shared weight matrix in case RBM is part of a DBN network; in a DBN,
@@ -202,6 +202,30 @@ class RBM(object):
 
 
 class SupervisedRBM(RBM):
+    
+    def __init__(
+        self,
+        n_visible,
+        n_labels,
+        n_hidden,
+        batch_size,
+        dropout_rate=0.0,
+        W=None,
+        hbias=None,
+        vbias=None,
+        np_rng=None,
+    ):
+        RBM.__init__(self,
+                     n_visible,
+                    n_hidden,
+                    batch_size,
+                    dropout_rate,
+                    W,
+                    hbias,
+                    vbias,
+                    np_rng)
+        self.n_labels = n_labels
+                    
 
     def propdown(self, h):
         '''This function propagates the hidden units activation downwards to
@@ -226,6 +250,7 @@ class SupervisedRBM(RBM):
                 
                 
     def predict_one(self, v):
+        #P(v_{label}|v_{data}) \propto \exp(a_{label}) * \prod_i(1+\exp(b_i + (W[v_{label}|v_{data}])_i))n
         prediction_base = np.concatenate((np.eye(self.n_labels, dtype=float), np.tile(v[self.n_labels:].astype(float),(self.n_labels,1))), axis=1)
         logp = np.sum(np.logaddexp(0, self.hbias + np.dot(prediction_base,self.W)), axis=1) + (self.vbias[:self.n_labels])
         #p = np.prod(1 + np.exp(self.hbias + np.dot(prediction_base,self.W)), axis=1) * np.exp(self.vbias[:self.n_labels])
@@ -238,3 +263,77 @@ class SupervisedRBM(RBM):
             count += (np.argmax(test_set[i,:self.n_labels]) == self.predict_one(test_set[i,:]))
         return float(count)/len(test_set)
         
+
+#==============================================================================
+#     def generate(self, label, k):
+#         '''\\
+# v^{(0)} := [v_{label}|0]\\
+# \text{Repeat k times:} \\
+# ~~~~h \sim P(h|v^{(k-1)})\\
+# ~~~~v \sim P(v^{(k-1)}|h)\\
+# ~~~~v^{(k)} := [v_{label}|v^{(k-1)}_{data}]'''
+#         v = np.zeros((1,self.n_visible))
+#         v[0,label] = 1
+#         count = 0
+#         while count < k or v[0,label] != 1:
+#             count += 1
+#             v = self.gibbs_vhv(v, np.ones((1,self.n_hidden)))
+#             print v[0,:self.n_labels]
+#         print "Sampled in", count, "iterations."
+#         return v
+#==============================================================================
+        
+        
+#==============================================================================
+#     def generate(self, label, k):
+#         '''\\
+# v^{(0)} := [v_{label}|0]\\
+# \text{Repeat k times:} \\
+# ~~~~h \sim P(h|v^{(k-1)})\\
+# ~~~~v \sim P(v^{(k-1)}|h)\\
+# ~~~~v^{(k)} := [v_{label}|v^{(k-1)}_{data}]'''
+# 
+#         max_count = 1000
+#         best = 0
+#         best_count = 0
+#         for i in range(k):
+#             v = np.zeros((1,self.n_visible))
+#             v[0,label] = 1
+#             count = 0
+#             while count < max_count and v[0,label] == 1:
+#                 if count == max_count:
+#                     return v
+#                 count += 1
+#                 save = v
+#                 v = self.gibbs_vhv(v, np.ones((1,self.n_hidden)))
+#             if count > best_count and np.sum(v) > 5:
+#                 best_count = count
+#                 best = save
+#             print count
+#         return best,best_count
+#==============================================================================
+        
+    def generate(self, label, k, n_ingr):
+        '''\\
+        v^{(0)} := [v_{label}|0]\\
+        \text{Repeat k times:} \\
+        ~~~~h \sim P(h|v^{(k-1)})\\
+        ~~~~v \sim P(v^{(k-1)}|h)\\
+        ~~~~v^{(k)} := [v_{label}|v^{(k-1)}_{data}]'''
+        v_label = np.zeros((1,self.n_labels))
+        v_label[0,label] = 1
+        v = np.zeros((1,self.n_visible))
+        v[0,label] = 1
+        best = v
+        max_ingr = 0
+        for i in range(k):
+            v = self.gibbs_vhv(v, np.ones((1,self.n_hidden)))
+            v[0,:self.n_labels] = v_label
+            ingr = np.sum(v)-1
+            if ingr > max_ingr:
+                max_ingr = ingr
+            if np.sum(v) > 5:
+                print i,np.sum(v)
+                best = v
+        print "Sampled in", k, "iterations, max_ingr is", max_ingr
+        return v
