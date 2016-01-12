@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 Created on Sat Dec 26 15:16:59 2015
-https://github.com/ogencoglu/WhatsCooking/blob/master/cook_it_up.py
+Inspired by https://github.com/ogencoglu/WhatsCooking/blob/master/cook_it_up.py
 @author: navrug
 """
 
@@ -12,10 +12,6 @@ reload(sys)
 sys.setdefaultencoding('utf-8')
 import numpy as np
 from sklearn.preprocessing import LabelEncoder
-#==============================================================================
-# from keras.models import Sequential
-# from keras.layers.core import Dense, Dropout
-#==============================================================================
 from nltk.stem.wordnet import WordNetLemmatizer
 import re
 import itertools
@@ -162,25 +158,6 @@ def extract_feats(ingredients, uniques):
             
     return np.hstack((feats_whole, feats_each)).astype(bool)
     
-
-    
-    
-#==============================================================================
-# def load_model():
-#     # load neural net model architectiure
-#     
-#     mdl = Sequential()
-#     mdl.add(Dense(512, init='glorot_uniform', activation='relu', 
-#                                         input_shape=(train_feats.shape[1],)))
-#     mdl.add(Dropout(0.5))
-#     mdl.add(Dense(128, init='glorot_uniform', activation='relu'))
-#     mdl.add(Dropout(0.5))
-#     mdl.add(Dense(20, activation='softmax'))
-#     mdl.compile(loss='categorical_crossentropy', optimizer='adadelta')
-#     
-#     return mdl    
-#==============================================================================
-
     
 if __name__ == '__main__':
     
@@ -214,43 +191,9 @@ if __name__ == '__main__':
     # of the training set.
     print("Feature extraction...\n") 
     uniques = list(set([item for sublist in train_ingredients for item in sublist]))
-    #train_feats = extract_feats(train_ingredients, uniques)
+    train_feats = extract_feats(train_ingredients, uniques)
     test_feats = extract_feats(test_ingredients, uniques)
     
-    #np.save('train_data',np.hstack((targets.astype(bool), train_feats)).astype(bool))
+    np.save('train_data',np.hstack((targets.astype(bool), train_feats)).astype(bool))
     np.save('test_id', test_ids)
     np.save('test_data', test_feats.astype(bool))
-    
-  
-#==============================================================================
-#     # train
-#     n_ensemble = 10
-#     for ens in range(n_ensemble):
-#         print("\n\tTraining...", ens)
-#         model = load_model()
-#         
-#         # if model already exists, continue training
-#         model_name = 'model' + str(ens) + '.hdf5'
-#         if os.path.isfile(model_name):
-#             model.load_weights(model_name)
-#             
-#         model.fit(train_feats, targets, nb_epoch=2500, batch_size=4096, 
-#                                                         show_accuracy = True)
-#         model.save_weights(model_name, overwrite=True)
-# 
-#     # create submission out of the ensemble
-#     preds = []
-#     for ens in range(n_ensemble):
-#         print("\nSubmission", ens)
-#         model = load_model()
-# 
-#         model_name = 'model' + str(ens) + '.hdf5'
-#         model.load_weights(model_name)            
-#         preds.append(model.predict_proba(test_feats))
-# 
-#     # final cuisine decision: argmax of sum of log probabilities  
-#     print("\nPredicting...")      
-#     preds = sum(np.log(preds))
-#     guess = le.inverse_transform(np.argmax(preds, axis=1))
-#     create_submission(test_ids, guess) 
-#==============================================================================

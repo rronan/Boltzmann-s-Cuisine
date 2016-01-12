@@ -12,6 +12,7 @@ to those without visible-visible and hidden-hidden connections.
 """
 
 import numpy as np
+import sys
 
 def sigmoid(x):
     return 1/(1+np.exp(-x))
@@ -313,27 +314,31 @@ class SupervisedRBM(RBM):
 #         return best,best_count
 #==============================================================================
         
-    def generate(self, label, k, n_ingr):
-        '''\\
-        v^{(0)} := [v_{label}|0]\\
-        \text{Repeat k times:} \\
-        ~~~~h \sim P(h|v^{(k-1)})\\
-        ~~~~v \sim P(v^{(k-1)}|h)\\
-        ~~~~v^{(k)} := [v_{label}|v^{(k-1)}_{data}]'''
-        v_label = np.zeros((1,self.n_labels))
-        v_label[0,label] = 1
-        v = np.zeros((1,self.n_visible))
-        v[0,label] = 1
-        best = v
+    def generate(self, uniques, label, k, obj_ingr=1, n_chains=10):
+        '''Sample from the RBM distribution.
+        Since most of the time we get empty recipes, we run a number of chains
+        in parallel to produce a satisfying number of recipes.'''
+        v_label = np.zeros((n_chains,self.n_labels))
+        v_label[:,label] = 1
+        v = np.zeros((n_chains,self.n_visible))
+        v[:,5] = 1
+        v[:,7] = 1
         max_ingr = 0
+        recipes = []
+        r = np.ones((n_chains,self.n_hidden))
         for i in range(k):
-            v = self.gibbs_vhv(v, np.ones((1,self.n_hidden)))
-            v[0,:self.n_labels] = v_label
-            ingr = np.sum(v)-1
-            if ingr > max_ingr:
-                max_ingr = ingr
-            if np.sum(v) > 5:
-                print i,np.sum(v)
-                best = v
+            sys.stdout.write("\rGeneration advancement: %d%%" % (100*float(i)/k))
+            sys.stdout.flush()
+            v = self.gibbs_vhv(v, r)
+            v[:,:self.n_labels] = v_label
+            n_ingr = np.sum(v[:,self.n_labels:(self.n_labels+len(uniques))], axis=1)
+            if np.max(n_ingr) > max_ingr:
+                max_ingr = np.max(n_ingr)
+                for j in range(len(v)):
+                    if n_ingr[j] > obj_ingr:
+                        print i,j, n_ingr[j]
+                        num = np.nonzero(v[j,self.n_labels:(self.n_labels+len(uniques))])
+                        recipe = uniques[num]
+                        print recipe
+                        recipes.append(recipe)
         print "Sampled in", k, "iterations, max_ingr is", max_ingr
-        return v

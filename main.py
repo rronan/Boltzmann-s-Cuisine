@@ -10,6 +10,9 @@ import timeit
 import numpy as np
 import sys 
 from RBM import SupervisedRBM
+from preprocessing import read_data
+from sklearn.preprocessing import LabelEncoder
+from preprocessing import create_submission
 
 import random
 
@@ -72,7 +75,7 @@ batches = [np_train_set[i:i + batch_size,:] \
 rng = np.random.RandomState(123)
 # construct the RBM class
 rbm = SupervisedRBM(n_visible=n_visible,
-#          n_labels=n_labels,
+          n_labels=n_labels,
           n_hidden=n_hidden, 
           dropout_rate=dropout_rate,
           batch_size=batch_size,
@@ -121,15 +124,27 @@ if do_report:
     report["hbias"] = rbm.hbias
     report["vbias"] = rbm.vbias
     np.save('report', report)
-#170 min/epoch, 0.48, 0.54, 0.65, 0.69, 0.69, 0.67, 0.74
 
 #%%============================================================================
-# Classifying with the RBM
+# Make a prediction
 #==============================================================================
 
-if do_report:
-    np.save('report', report)
-    
+test_data = np.load('test_data.npy')
+test_data = np.concatenate((np.zeros((len(test_data),20)), test_data), axis=1)
+y_pred = np.zeros(len(test_data))
+for i in xrange(len(y_pred)):
+    sys.stdout.write("\rPrediction advancement: %d%%" % (100*float(i)/len(y_pred)))
+    sys.stdout.flush() 
+    y_pred[i] = rbm.predict_one(test_data[i,:])
+train_ids, train_cuisines, train_ingredients = read_data('train.json')
+test_ids, test_cuisines, test_ingredients = read_data('test.json')
+del train_ids, train_ingredients, test_cuisines, test_ingredients
+le = LabelEncoder()
+le.fit(train_cuisines)
+pred = le.inverse_transform(y_pred.astyp('int'))
+create_submission(test_ids, pred)
+
+
 #%%============================================================================
 # Sampling from the RBM
 #==============================================================================
@@ -146,8 +161,4 @@ train_ingredients = stem_words(train_ingredients)
 uniques = np.array(list(set([item for sublist in train_ingredients for item in sublist])))
 
 #%%
-binary, count = rbm.generate(3,10)
-print count
-num = np.nonzero(binary[0,n_labels:(n_labels+len(uniques))])
-ingr = uniques[num]
-print ingr
+rbm.generate(uniques, 5, 1000, obj_ingr=5, n_chains=10)
